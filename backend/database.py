@@ -14,11 +14,14 @@ if not SQLALCHEMY_DATABASE_URL:
   raise ValueError("DATABASE_URL is not set in the environment variables.")
 
 # 3. Create the Engine
-# 'pool_pre_ping=True' is crucial for cloud databases (like Supabase) 
-# to handle dropped connections gracefully.
+
+connect_args = {}
+if "supabase.co" not in SQLALCHEMY_DATABASE_URL:
+  connect_args = {"sslmode": "disable"}
+
 engine = create_engine(
   SQLALCHEMY_DATABASE_URL,
-  connect_args={"sslmode": "require"},
+  connect_args=connect_args,
   pool_pre_ping=True,
   pool_recycle=300 
 )

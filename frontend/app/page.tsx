@@ -31,7 +31,7 @@ type Incident = {
   owner_id: string;
 };
 
-const CURRENT_USER_ID = "e4df552c-dafc-47cb-ae9f-24b8d25dc8c0";
+const CURRENT_USER_ID = "aac1865f-7035-4019-b54b-c3dd2dbbc416";
 
 export default function IncidentDashboard() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
@@ -133,7 +133,7 @@ export default function IncidentDashboard() {
         <Card className="border-l-4 border-l-green-500 shadow-sm">
           <CardContent className="pt-5">
             <div className="text-sm font-medium text-slate-500 uppercase tracking-wider">Total Active</div>
-            <div className="text-3xl font-bold text-slate-900">{incidents.length}</div>
+            <div className="text-3xl font-bold text-slate-900">{incidents.filter(i => i.status !== 'RESOLVED').length}</div>
           </CardContent>
         </Card>
       </div>

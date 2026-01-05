@@ -1,0 +1,50 @@
+services:
+  # 1. Backend Service
+  backend:
+    build: ./backend
+    container_name: incidentflow-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    depends_on:
+      db:
+        condition: service_healthy 
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/incidentflow
+
+  # 2. Frontend Service
+  frontend:
+    build: ./frontend
+    container_name: incidentflow-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      # Since the browser (client) accesses the API, we use localhost
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+  
+  # 3. Database Service
+  db:
+    image: postgres:15-alpine
+    container_name: incidentflow-db
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=incidentflow
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/incidentflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/db_init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
