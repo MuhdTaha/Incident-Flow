@@ -22,6 +22,7 @@ import {
   Clock 
 } from "lucide-react";
 import IncidentHistory from "./components/IncidentHistory";
+import CreateIncidentModal from "./components/CreateIncidentModal";
 
 type Incident = {
   id: string;
@@ -114,7 +115,9 @@ export default function IncidentDashboard() {
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           Refresh Feed
         </Button>
+        <CreateIncidentModal onIncidentCreated={fetchIncidents} />
       </div>
+      
 
       {/* Summary Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

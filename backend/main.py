@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from database import get_db, engine
 import models
 from fsm import can_transition, IncidentStatus
@@ -24,9 +24,24 @@ class TransitionRequest(BaseModel):
   new_state: IncidentStatus
   actor_id: str  # In a real app, this comes from the JWT Token
   comment: Optional[str] = None
+  
+class IncidentCreate(BaseModel):
+  title: str
+  description: str
+  severity: models.IncidentSeverity
+  owner_id: str
+  
+class UserRead(BaseModel):
+  id: str
+  full_name: str
+  role: str
+  
+  class Config:
+    from_attributes = True
 
 # --- Endpoints ---
 
+# Transition Incident State with Audit Logging
 @app.post("/incidents/{incident_id}/transition")
 def transition_incident(
   incident_id: str, 
@@ -45,7 +60,7 @@ def transition_incident(
       detail=f"Invalid transition: Cannot move from {incident.status} to {request.new_state}"
     )
 
-  # 3. ENGINEERING HIGHLIGHT: Atomic Transaction
+  # 3. Atomic Transaction
   # We prepare both the update and the audit log before committing.
   try:
     old_state = incident.status
@@ -69,16 +84,19 @@ def transition_incident(
     db.refresh(incident)
       
   except Exception as e:
+    # Rollback in case of error
     db.rollback()
     raise HTTPException(status_code=500, detail=str(e))
 
   return {"id": incident.id, "status": incident.status, "message": "Transition successful"}
 
+# Get list of incidents for dashboard
 @app.get("/incidents")
 def get_incidents(db: Session = Depends(get_db)):
   # Simple fetch for the dashboard
   return db.query(models.Incident).all()
 
+# Get audit logs for an incident
 @app.get("/incidents/{incident_id}/events")
 def get_incident_events(incident_id: str, db: Session = Depends(get_db)):
   # Fetch audit logs for an incident
@@ -86,3 +104,39 @@ def get_incident_events(incident_id: str, db: Session = Depends(get_db)):
     .filter(models.IncidentEvent.incident_id == incident_id)\
     .order_by(models.IncidentEvent.created_at.desc())\
     .all()
+  
+# Create a new incident with initial audit log
+@app.post("/incidents", response_model=dict)
+def create_incident(incident: IncidentCreate, db: Session = Depends(get_db)):
+  # 1. Create the Incident Record
+  new_incident = models.Incident(
+    title=incident.title,
+    description=incident.description,
+    severity=incident.severity,
+    owner_id=incident.owner_id,
+    status=models.IncidentStatus.DETECTED
+  )
+  
+  db.add(new_incident)
+  db.flush()  # To get the ID
+  
+  # 2. Create Initial Audit Log
+  audit_log = models.IncidentEvent(
+    incident_id=new_incident.id,
+    actor_id=incident.owner_id,
+    event_type="CREATION",
+    old_value=None,
+    new_value=models.IncidentStatus.DETECTED,
+    comment=f"Incident declared: {new_incident.title}"
+  )
+  
+  db.add(audit_log)
+  db.commit()
+  
+  return {"id": str(new_incident.id), "message": "Incident created successfully"}
+
+# Get list of users
+@app.get("/users", response_model=List[UserRead])
+def get_users(db: Session = Depends(get_db)):
+  users = db.query(models.User).all()
+  return users
