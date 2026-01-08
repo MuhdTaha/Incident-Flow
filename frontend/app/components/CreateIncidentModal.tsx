@@ -52,7 +52,7 @@ export default function CreateIncidentModal({ onIncidentCreated }: { onIncidentC
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title,
-          desc,
+          description: desc,
           severity,
           owner_id: ownerId,
         }),

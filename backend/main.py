@@ -1,11 +1,12 @@
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, computed_field, Field
 from typing import Optional, List
 from database import get_db, engine
+from uuid import UUID
 import models
-from fsm import can_transition, IncidentStatus
+from fsm import can_transition, IncidentStatus, VALID_TRANSITIONS
 
 # Create tables (for local dev; in prod use Alembic)
 models.Base.metadata.create_all(bind=engine)
@@ -25,6 +26,10 @@ class TransitionRequest(BaseModel):
   actor_id: str  # In a real app, this comes from the JWT Token
   comment: Optional[str] = None
   
+class CommentRequest(BaseModel):
+  comment: str
+  actor_id: str
+  
 class IncidentCreate(BaseModel):
   title: str
   description: str
@@ -32,9 +37,25 @@ class IncidentCreate(BaseModel):
   owner_id: str
   
 class UserRead(BaseModel):
-  id: str
+  id: UUID
   full_name: str
   role: str
+  
+  class Config:
+    from_attributes = True
+
+class IncidentRead(BaseModel):
+  id: UUID
+  title: str
+  description: str
+  severity: str
+  status: str
+  owner_id: UUID
+  
+  @computed_field
+  @property
+  def allowed_transitions(self) -> List[str]:
+    return VALID_TRANSITIONS.get(IncidentStatus(self.status), [])
   
   class Config:
     from_attributes = True
@@ -90,8 +111,33 @@ def transition_incident(
 
   return {"id": incident.id, "status": incident.status, "message": "Transition successful"}
 
+# Post for comments on an incident
+@app.post("/incidents/{incident_id}/comment")
+def comment_on_incident(incident_id: str, request: CommentRequest, db: Session = Depends(get_db)): 
+  # 1. Fetch Incident
+  incident = db.query(models.Incident).filter(models.Incident.id == incident_id).first()
+  if not incident:
+    raise HTTPException(status_code=404, detail="Incident not found")
+  
+  try:
+    # 2. Insert Immutable Audit Log for Comment
+    audit_log = models.IncidentEvent(
+      incident_id=incident.id,
+      actor_id=request.actor_id,
+      event_type="COMMENT",
+      comment=request.comment
+    )
+    db.add(audit_log)
+    db.commit()
+    
+  except Exception as e:
+    db.rollback()
+    raise HTTPException(status_code=500, detail=str(e))
+  
+  return {"id": incident.id, "message": "Comment added successfully"}
+
 # Get list of incidents for dashboard
-@app.get("/incidents")
+@app.get("/incidents", response_model=List[IncidentRead])
 def get_incidents(db: Session = Depends(get_db)):
   # Simple fetch for the dashboard
   return db.query(models.Incident).all()
@@ -108,35 +154,43 @@ def get_incident_events(incident_id: str, db: Session = Depends(get_db)):
 # Create a new incident with initial audit log
 @app.post("/incidents", response_model=dict)
 def create_incident(incident: IncidentCreate, db: Session = Depends(get_db)):
-  # 1. Create the Incident Record
-  new_incident = models.Incident(
-    title=incident.title,
-    description=incident.description,
-    severity=incident.severity,
-    owner_id=incident.owner_id,
-    status=models.IncidentStatus.DETECTED
-  )
+  try:
+    # 1. Create the Incident Record
+    new_incident = models.Incident(
+      title=incident.title,
+      description=incident.description,
+      severity=incident.severity,
+      owner_id=incident.owner_id,
+      status=models.IncidentStatus.DETECTED
+    )
+    
+    db.add(new_incident)
+    db.flush()  # To get the ID
+    
+    # 2. Create Initial Audit Log
+    audit_log = models.IncidentEvent(
+      incident_id=new_incident.id,
+      actor_id=incident.owner_id,
+      event_type="CREATION",
+      old_value=None,
+      new_value=models.IncidentStatus.DETECTED,
+      comment=f"Incident declared: {new_incident.title}"
+    )
+    
+    db.add(audit_log)
+    db.commit()
+    
+    return {"id": str(new_incident.id), "message": "Incident created successfully"}
   
-  db.add(new_incident)
-  db.flush()  # To get the ID
-  
-  # 2. Create Initial Audit Log
-  audit_log = models.IncidentEvent(
-    incident_id=new_incident.id,
-    actor_id=incident.owner_id,
-    event_type="CREATION",
-    old_value=None,
-    new_value=models.IncidentStatus.DETECTED,
-    comment=f"Incident declared: {new_incident.title}"
-  )
-  
-  db.add(audit_log)
-  db.commit()
-  
-  return {"id": str(new_incident.id), "message": "Incident created successfully"}
+  except Exception as e:
+    db.rollback()
+    raise HTTPException(status_code=500, detail=str(e))
 
 # Get list of users
 @app.get("/users", response_model=List[UserRead])
 def get_users(db: Session = Depends(get_db)):
-  users = db.query(models.User).all()
-  return users
+  try:
+    users = db.query(models.User).all()
+    return users
+  except Exception as e:
+    raise HTTPException(status_code=500, detail=str(e))
