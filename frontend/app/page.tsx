@@ -24,7 +24,8 @@ import {
 } from "lucide-react";
 import IncidentHistory from "./components/IncidentHistory";
 import CreateIncidentModal from "./components/CreateIncidentModal";
-import IncidentActionModal from "./components/IncidentActionModal";
+import IncidentActionModal from "./components/IncidentActionModal";2
+import { useAuth } from "@/context/AuthContext";
 
 type Incident = {
   id: string;
@@ -35,10 +36,10 @@ type Incident = {
   allowed_transitions: string[];
 };
 
-const CURRENT_USER_ID = "7886bc74-aed9-4fb9-a940-458598048f86";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 export default function IncidentDashboard() {
+  const { user } = useAuth();
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
@@ -83,18 +84,8 @@ export default function IncidentDashboard() {
     }
   };
 
-  const getActionColor = (action: string) => {
-    switch (action) {
-      case "INVESTIGATING": return "bg-blue-600 hover:bg-blue-700";
-      case "MITIGATED": return "bg-emerald-600 hover:bg-emerald-700";
-      case "RESOLVED": return "bg-green-600 hover:bg-green-700";
-      case "CLOSED": return "bg-slate-600 hover:bg-slate-700";
-      case "ESCALATED": return "bg-red-600 hover:bg-red-700";
-      default: return "bg-slate-100 text-slate-900 border-slate-200 hover:bg-slate-200";
-    }
-  };
-
   const selectedIncident = incidents.find(i => i.id === selectedIncidentId); 
+  
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8 bg-slate-50/50 min-h-screen">
       {/* Header Section */}

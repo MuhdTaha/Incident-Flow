@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ArrowRightLeft, MessageSquare } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 type Incident = {
   id: string;
@@ -32,11 +33,10 @@ type IncidentActionModalProps = {
   onSuccess: () => void;
 };
 
-// Mock User ID (Replace with Auth later)
-const CURRENT_USER_ID = "7886bc74-aed9-4fb9-a940-458598048f86";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function IncidentActionModal({ incident, isOpen, onClose, onSuccess }: IncidentActionModalProps) {
+  const { user } = useAuth();
   const [actionType, setActionType] = useState<"TRANSITION" | "COMMENT">("TRANSITION");
   const [selectedState, setSelectedState] = useState<string>("");
   const [comment, setComment] = useState<string>("");
@@ -58,7 +58,7 @@ export default function IncidentActionModal({ incident, isOpen, onClose, onSucce
   }, [incident, isOpen]);
 
   const handleSubmit = async () => {
-    if (!incident) return;
+    if (!incident || !user) return;
     setLoading(true);
 
     try {
@@ -69,7 +69,7 @@ export default function IncidentActionModal({ incident, isOpen, onClose, onSucce
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             new_state: selectedState,
-            actor_id: CURRENT_USER_ID,
+            actor_id: user.id,
             comment: comment || "State updated via Action Modal",
           }),
         });
@@ -81,7 +81,7 @@ export default function IncidentActionModal({ incident, isOpen, onClose, onSucce
           method: "POST",
           headers: { "Content-Type": "application/json"},
           body: JSON.stringify({
-            actor_id: CURRENT_USER_ID,
+            actor_id: user.id,
             comment: comment,
           }),
         });
@@ -109,7 +109,7 @@ export default function IncidentActionModal({ incident, isOpen, onClose, onSucce
     }
   };
 
-  if (!incident) return null;
+  if (!incident || !user) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
