@@ -7,6 +7,7 @@ from database import get_db, engine
 from uuid import UUID
 import models
 from fsm import can_transition, IncidentStatus, VALID_TRANSITIONS
+from deps import get_current_user, RoleChecker
 
 # Create tables (for local dev; in prod use Alembic)
 models.Base.metadata.create_all(bind=engine)
@@ -23,19 +24,17 @@ app.add_middleware(
 # --- Schemas ---
 class TransitionRequest(BaseModel):
   new_state: IncidentStatus
-  actor_id: str  # In a real app, this comes from the JWT Token
   comment: Optional[str] = None
   
 class CommentRequest(BaseModel):
   comment: str
-  actor_id: str
   
 class IncidentCreate(BaseModel):
   title: str
   description: str
   severity: models.IncidentSeverity
-  owner_id: str
-  
+  owner_id: Optional[UUID] = None
+
 class UserRead(BaseModel):
   id: UUID
   full_name: str
@@ -59,15 +58,72 @@ class IncidentRead(BaseModel):
   
   class Config:
     from_attributes = True
+    
+require_admin = RoleChecker(["ADMIN"])
+require_manager = RoleChecker(["ADMIN", "MANAGER"])
 
 # --- Endpoints ---
+
+# Create a new incident with initial audit log
+@app.post("/incidents", response_model=dict)
+def create_incident(
+  incident: IncidentCreate, 
+  db: Session = Depends(get_db), 
+  current_user: models.User = Depends(get_current_user)
+):
+  try:
+    # RBAC Logic for Assignment
+    final_owner_id = current_user.id
+    
+    if incident.owner_id:
+      if incident.owner_id != current_user.id:
+        if current_user.role not in ["ADMIN", "MANAGER"]:
+          raise HTTPException(status_code=403, detail="Not authorized to assign incidents to others")
+        
+        final_owner_id = incident.owner_id
+    
+    # 1. Create the Incident Record
+    new_incident = models.Incident(
+      title=incident.title,
+      description=incident.description,
+      severity=incident.severity,
+      owner_id=final_owner_id,
+      status=models.IncidentStatus.DETECTED
+    )
+    
+    db.add(new_incident)
+    db.flush()  # To get the ID
+    
+    # 2. Create Initial Audit Log
+    audit_log = models.IncidentEvent(
+      incident_id=new_incident.id,
+      actor_id=current_user.id,
+      event_type="CREATION",
+      old_value=None,
+      new_value=models.IncidentStatus.DETECTED,
+      comment=f"Incident declared by {current_user.full_name}" + 
+            (f" (Assigned to {final_owner_id})" if final_owner_id != current_user.id else "")
+    )
+    
+    db.add(audit_log)
+    db.commit()
+    
+    return {"id": str(new_incident.id), "message": "Incident created successfully"}
+  
+  except HTTPException as he:
+    raise he
+  except Exception as e:
+    db.rollback()
+    raise HTTPException(status_code=500, detail=str(e))
+
 
 # Transition Incident State with Audit Logging
 @app.post("/incidents/{incident_id}/transition")
 def transition_incident(
   incident_id: str, 
   request: TransitionRequest, 
-  db: Session = Depends(get_db)
+  db: Session = Depends(get_db), 
+  current_user: models.User = Depends(get_current_user)
 ):
   # 1. Fetch Incident
   incident = db.query(models.Incident).filter(models.Incident.id == incident_id).first()
@@ -92,7 +148,7 @@ def transition_incident(
     # B. Insert Immutable Audit Log
     audit_log = models.IncidentEvent(
       incident_id=incident.id,
-      actor_id=request.actor_id,
+      actor_id=current_user.id,
       event_type="STATUS_CHANGE",
       old_value=old_state,
       new_value=request.new_state,
@@ -111,9 +167,15 @@ def transition_incident(
 
   return {"id": incident.id, "status": incident.status, "message": "Transition successful"}
 
+
 # Post for comments on an incident
 @app.post("/incidents/{incident_id}/comment")
-def comment_on_incident(incident_id: str, request: CommentRequest, db: Session = Depends(get_db)): 
+def comment_on_incident(
+  incident_id: str, 
+  request: CommentRequest, 
+  db: Session = Depends(get_db), 
+  current_user: models.User = Depends(get_current_user)
+): 
   # 1. Fetch Incident
   incident = db.query(models.Incident).filter(models.Incident.id == incident_id).first()
   if not incident:
@@ -123,7 +185,7 @@ def comment_on_incident(incident_id: str, request: CommentRequest, db: Session =
     # 2. Insert Immutable Audit Log for Comment
     audit_log = models.IncidentEvent(
       incident_id=incident.id,
-      actor_id=request.actor_id,
+      actor_id=current_user.id,
       event_type="COMMENT",
       comment=request.comment
     )
@@ -135,6 +197,7 @@ def comment_on_incident(incident_id: str, request: CommentRequest, db: Session =
     raise HTTPException(status_code=500, detail=str(e))
   
   return {"id": incident.id, "message": "Comment added successfully"}
+
 
 # Get list of incidents for dashboard
 @app.get("/incidents", response_model=List[IncidentRead])
@@ -151,41 +214,7 @@ def get_incident_events(incident_id: str, db: Session = Depends(get_db)):
     .order_by(models.IncidentEvent.created_at.desc())\
     .all()
   
-# Create a new incident with initial audit log
-@app.post("/incidents", response_model=dict)
-def create_incident(incident: IncidentCreate, db: Session = Depends(get_db)):
-  try:
-    # 1. Create the Incident Record
-    new_incident = models.Incident(
-      title=incident.title,
-      description=incident.description,
-      severity=incident.severity,
-      owner_id=incident.owner_id,
-      status=models.IncidentStatus.DETECTED
-    )
-    
-    db.add(new_incident)
-    db.flush()  # To get the ID
-    
-    # 2. Create Initial Audit Log
-    audit_log = models.IncidentEvent(
-      incident_id=new_incident.id,
-      actor_id=incident.owner_id,
-      event_type="CREATION",
-      old_value=None,
-      new_value=models.IncidentStatus.DETECTED,
-      comment=f"Incident declared: {new_incident.title}"
-    )
-    
-    db.add(audit_log)
-    db.commit()
-    
-    return {"id": str(new_incident.id), "message": "Incident created successfully"}
   
-  except Exception as e:
-    db.rollback()
-    raise HTTPException(status_code=500, detail=str(e))
-
 # Get list of users
 @app.get("/users", response_model=List[UserRead])
 def get_users(db: Session = Depends(get_db)):

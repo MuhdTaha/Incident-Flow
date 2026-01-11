@@ -26,6 +26,7 @@ import IncidentHistory from "./components/IncidentHistory";
 import CreateIncidentModal from "./components/CreateIncidentModal";
 import IncidentActionModal from "./components/IncidentActionModal";2
 import { useAuth } from "@/context/AuthContext";
+import { authFetch } from "@/lib/api";
 
 type Incident = {
   id: string;
@@ -50,7 +51,7 @@ export default function IncidentDashboard() {
   const fetchIncidents = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/incidents`);
+      const res = await authFetch("/incidents");
       const data = await res.json();
       setIncidents(data);
     } catch (e) {
@@ -85,7 +86,7 @@ export default function IncidentDashboard() {
   };
 
   const selectedIncident = incidents.find(i => i.id === selectedIncidentId); 
-  
+
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8 bg-slate-50/50 min-h-screen">
       {/* Header Section */}

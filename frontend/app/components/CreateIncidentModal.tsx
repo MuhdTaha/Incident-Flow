@@ -12,6 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, AlertTriangle } from "lucide-react";
+import { authFetch } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 type User = {
   id: string;
@@ -19,25 +21,30 @@ type User = {
 }
 
 export default function CreateIncidentModal({ onIncidentCreated }: { onIncidentCreated: () => void }) {
-  // Props
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
-  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Assignee Data
+  const [users, setUsers] = useState<User[]>([]);
+  const [assigneeId, setAssigneeId] = useState<string>("");
 
   // Form State
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
   const [severity, setSeverity] = useState<"SEV1" | "SEV2" | "SEV3" | "SEV4">("SEV4");
-  const [ownerId, setOwnerId] = useState<string>("");
 
-  // Fetch users for owner selection
+  // Fetch users for assignee selection
   useEffect(() => {
     if (open) {
-      fetch("http://localhost:8000/users")
-        .then((res) => res.json())
+      authFetch("/users")
+        .then((res) => {
+          if (!res.ok) throw new Error("Failed to fetch users");
+          return res.json();
+        })
         .then((data) => {
           setUsers(data);
-          if (data.length > 0) setOwnerId(data[0].id); // Default to first user
+          if (data.length > 0) setAssigneeId(data[0].id); // Default to first user
         })
         .catch(() => console.error("Failed to fetch users"));
     }
@@ -46,16 +53,18 @@ export default function CreateIncidentModal({ onIncidentCreated }: { onIncidentC
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+
     try {
-      const res = await fetch("http://localhost:8000/incidents", {
+      const payload: any = {
+        title,
+        description: desc,
+        severity,
+      };
+      if (assigneeId && assigneeId !== user?.id) payload.owner_id = assigneeId;
+
+      const res = await authFetch("/incidents", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title,
-          description: desc,
-          severity,
-          owner_id: ownerId,
-        }),
+        body: JSON.stringify(payload),
       });
     
       if (res.ok) {
@@ -66,13 +75,13 @@ export default function CreateIncidentModal({ onIncidentCreated }: { onIncidentC
         setTitle("");
         setDesc("");
         setSeverity("SEV4");
-        setOwnerId(users.length > 0 ? users[0].id : "");
+        if(user) setAssigneeId(user.id);
       } else {
-        console.error("Failed to create incident");
-        alert("Failed to create incident");
+        const err = await res.json();
+        alert("Failed to create incident: " + err.message);
       }
-    } catch (e) {
-      console.error("Network error");
+    } catch (error) {
+      console.error("Network error:", error);
       alert("Network error");
     } finally {
       setLoading(false);
@@ -122,12 +131,12 @@ export default function CreateIncidentModal({ onIncidentCreated }: { onIncidentC
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="owner" className="font-semibold">Assignee</Label>
+              <Label htmlFor="assignee" className="font-semibold">Assignee</Label>
               <select
-                id="owner"
+                id="assignee"
                 className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-slate-950"
-                value={ownerId}
-                onChange={(e) => setOwnerId(e.target.value)}
+                value={assigneeId}
+                onChange={(e) => setAssigneeId(e.target.value)}
               >
                 {users.map((u) => (
                   <option key={u.id} value={u.id}>

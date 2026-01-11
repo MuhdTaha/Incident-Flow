@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { ArrowRightLeft, MessageSquare } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { authFetch } from "@/lib/api";
 
 type Incident = {
   id: string;
@@ -64,7 +65,7 @@ export default function IncidentActionModal({ incident, isOpen, onClose, onSucce
     try {
       // Handle State Transition
       if (actionType === "TRANSITION") {
-        const res = await fetch(`${API_URL}/incidents/${incident.id}/transition`, {
+        const res = await authFetch(`/incidents/${incident.id}/transition`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -77,7 +78,7 @@ export default function IncidentActionModal({ incident, isOpen, onClose, onSucce
         if (!res.ok) throw new Error("Failed to transition incident");
       } else if (actionType === "COMMENT" && comment) {
         // Handle Comment Addition
-        const res = await fetch(`${API_URL}/incidents/${incident.id}/comment`, {
+        const res = await authFetch(`/incidents/${incident.id}/comment`, {
           method: "POST",
           headers: { "Content-Type": "application/json"},
           body: JSON.stringify({
