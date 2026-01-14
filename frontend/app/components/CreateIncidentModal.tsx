@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Plus, AlertTriangle } from "lucide-react";
 import { authFetch } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { useUserDirectory } from "@/context/UserContext";
 
 type User = {
   id: string;
@@ -21,34 +22,23 @@ type User = {
 }
 
 export default function CreateIncidentModal({ onIncidentCreated }: { onIncidentCreated: () => void }) {
-  const { user } = useAuth();
+  const { user: currentUser } = useAuth();
+  const { users } = useUserDirectory(); // Get global user data
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-
-  // Assignee Data
-  const [users, setUsers] = useState<User[]>([]);
-  const [assigneeId, setAssigneeId] = useState<string>("");
 
   // Form State
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
   const [severity, setSeverity] = useState<"SEV1" | "SEV2" | "SEV3" | "SEV4">("SEV4");
+  const [assigneeId, setAssigneeId] = useState<string>("");
 
-  // Fetch users for assignee selection
+  // Set default assignee to current user when the modal opens
   useEffect(() => {
-    if (open) {
-      authFetch("/users")
-        .then((res) => {
-          if (!res.ok) throw new Error("Failed to fetch users");
-          return res.json();
-        })
-        .then((data) => {
-          setUsers(data);
-          if (data.length > 0) setAssigneeId(data[0].id); // Default to first user
-        })
-        .catch(() => console.error("Failed to fetch users"));
+    if (open && currentUser && !assigneeId) {
+      setAssigneeId(currentUser.id);
     }
-  }, [open]);
+  }, [open, currentUser, assigneeId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,7 +50,7 @@ export default function CreateIncidentModal({ onIncidentCreated }: { onIncidentC
         description: desc,
         severity,
       };
-      if (assigneeId && assigneeId !== user?.id) payload.owner_id = assigneeId;
+      if (assigneeId && assigneeId !== currentUser?.id) payload.owner_id = assigneeId;
 
       const res = await authFetch("/incidents", {
         method: "POST",
@@ -75,7 +65,7 @@ export default function CreateIncidentModal({ onIncidentCreated }: { onIncidentC
         setTitle("");
         setDesc("");
         setSeverity("SEV4");
-        if(user) setAssigneeId(user.id);
+        setAssigneeId(currentUser?.id || "");
       } else {
         const err = await res.json();
         alert("Failed to create incident: " + err.message);
@@ -131,6 +121,7 @@ export default function CreateIncidentModal({ onIncidentCreated }: { onIncidentC
             </div>
 
             <div className="grid gap-2">
+              {/* Assignee Selector */}
               <Label htmlFor="assignee" className="font-semibold">Assignee</Label>
               <select
                 id="assignee"

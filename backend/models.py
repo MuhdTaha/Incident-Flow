@@ -53,7 +53,7 @@ class Incident(Base):
   status = Column(SQLEnum(IncidentStatus), default=IncidentStatus.DETECTED, nullable=False)
   owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
   created_at = Column(DateTime(timezone=True), server_default=func.now())
-  updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+  updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
   # Relationships
   owner = relationship("User", back_populates="incidents")

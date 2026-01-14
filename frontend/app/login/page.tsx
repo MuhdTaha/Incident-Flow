@@ -11,6 +11,7 @@ import { AlertCircle, Lock } from "lucide-react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
+  const [fullName, setFullName] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +31,7 @@ export default function LoginPage() {
           email,
           password,
           options: {
-            data: { full_name: email.split("@")[0] }, // Pass metadata for our DB trigger
+            data: { full_name: fullName }, // Pass metadata for our DB trigger
           },
         });
       } else {
@@ -80,6 +81,19 @@ export default function LoginPage() {
                 required
               />
             </div>
+            {isSignUp && 
+              <div className="space-y-2">
+                <Label htmlFor="full_name">Full Name</Label>
+                <Input
+                  id="full_name"
+                  type="text"
+                  placeholder="John Doe"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required
+                />
+              </div>   
+            }
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <Input

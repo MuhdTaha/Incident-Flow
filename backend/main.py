@@ -6,6 +6,7 @@ from typing import Optional, List
 from database import get_db, engine
 from uuid import UUID
 import models
+from datetime import datetime
 from fsm import can_transition, IncidentStatus, VALID_TRANSITIONS
 from deps import get_current_user, RoleChecker
 
@@ -50,6 +51,7 @@ class IncidentRead(BaseModel):
   severity: str
   status: str
   owner_id: UUID
+  updated_at: datetime
   
   @computed_field
   @property
@@ -120,7 +122,7 @@ def create_incident(
 # Transition Incident State with Audit Logging
 @app.post("/incidents/{incident_id}/transition")
 def transition_incident(
-  incident_id: str, 
+  incident_id: UUID, 
   request: TransitionRequest, 
   db: Session = Depends(get_db), 
   current_user: models.User = Depends(get_current_user)
@@ -171,7 +173,7 @@ def transition_incident(
 # Post for comments on an incident
 @app.post("/incidents/{incident_id}/comment")
 def comment_on_incident(
-  incident_id: str, 
+  incident_id: UUID, 
   request: CommentRequest, 
   db: Session = Depends(get_db), 
   current_user: models.User = Depends(get_current_user)
@@ -207,7 +209,7 @@ def get_incidents(db: Session = Depends(get_db)):
 
 # Get audit logs for an incident
 @app.get("/incidents/{incident_id}/events")
-def get_incident_events(incident_id: str, db: Session = Depends(get_db)):
+def get_incident_events(incident_id: UUID, db: Session = Depends(get_db)):
   # Fetch audit logs for an incident
   return db.query(models.IncidentEvent)\
     .filter(models.IncidentEvent.incident_id == incident_id)\
