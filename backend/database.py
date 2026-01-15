@@ -8,19 +8,23 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # 2. Get the Database URL
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./test.db")
 
-if not SQLALCHEMY_DATABASE_URL:
+if not DATABASE_URL:
   raise ValueError("DATABASE_URL is not set in the environment variables.")
 
 # 3. Create the Engine
-
 connect_args = {}
-if "supabase.co" not in SQLALCHEMY_DATABASE_URL:
+if "sqlite" in DATABASE_URL:
+  connect_args = {"check_same_thread": False}
+elif "supabase.co" in DATABASE_URL:
+  connect_args = {"sslmode": "require"}
+else:
+  # Local Docker Postgres
   connect_args = {"sslmode": "disable"}
 
 engine = create_engine(
-  SQLALCHEMY_DATABASE_URL,
+  DATABASE_URL,
   connect_args=connect_args,
   pool_pre_ping=True,
   pool_recycle=300 
