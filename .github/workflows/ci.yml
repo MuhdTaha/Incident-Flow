@@ -28,6 +28,7 @@ jobs:
         env:
           SUPABASE_JWT_SECRET: "test-secret"
           DATABASE_URL: "sqlite://"
+          TESTING: "True"
         run: |
           cd backend
           pytest

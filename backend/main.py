@@ -6,12 +6,16 @@ from typing import Optional, List
 from database import get_db, engine
 from uuid import UUID
 import models
+import os
 from datetime import datetime
 from fsm import can_transition, IncidentStatus, VALID_TRANSITIONS
 from deps import get_current_user, RoleChecker
 
 # Create tables (for local dev; in prod use Alembic)
 models.Base.metadata.create_all(bind=engine)
+
+if os.getenv("TESTING") != "True":
+  models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 app.add_middleware(
