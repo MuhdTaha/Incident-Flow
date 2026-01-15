@@ -8,7 +8,7 @@ on:
 
 jobs:
   # Job 1: Check Backend
-  build-backend:
+  build-and-test-backend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -24,14 +24,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           
-      # Add linting or tests here later (e.g., pytest)
-      - name: Test Build (Dry Run)
+      - name: Run Backend Tests
+        env:
+          SUPABASE_JWT_SECRET: "test-secret"
+          DATABASE_URL: "sqlite://"
         run: |
           cd backend
-          python -m compileall .
+          pytest
 
   # Job 2: Check Frontend
-  build-frontend:
+  build-and-test-frontend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -47,6 +49,11 @@ jobs:
         run: |
           cd frontend
           npm ci
+      
+      - name: Run Frontend Tests
+        run: |
+          cd frontend
+          npm test
 
       - name: Run Build
         env:
@@ -59,7 +66,7 @@ jobs:
   # Job 3: Verify Docker Builds (Ensures Dockerfiles are valid)
   docker-check:
     runs-on: ubuntu-latest
-    needs: [build-backend, build-frontend]
+    needs: [build-and-test-backend, build-and-test-frontend]
     steps:
       - uses: actions/checkout@v3
       
@@ -67,4 +74,4 @@ jobs:
         run: docker build ./backend -t incidentflow-backend
         
       - name: Build Frontend Image
-        run: docker build ./frontend --build-arg NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }} \--build-arg NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY }} \-t incidentflow-frontend
+        run: docker build ./frontend --build-arg NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }} --build-arg NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY }} -t incidentflow-frontend

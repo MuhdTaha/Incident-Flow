@@ -5,6 +5,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.90.1",
+    "jest": "^30.2.0",
     "lucide-react": "^0.562.0"
   }
 }
