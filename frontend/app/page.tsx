@@ -218,7 +218,7 @@ export default function IncidentDashboard() {
                       }}
                     >
                       <Settings2 className="h-3.5 w-3.5" />
-                      Action
+                      Manage
                     </Button>
                   </TableCell>
                 </TableRow>

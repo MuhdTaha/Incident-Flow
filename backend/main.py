@@ -12,9 +12,6 @@ from datetime import datetime
 from fsm import can_transition, IncidentStatus, VALID_TRANSITIONS
 from deps import get_current_user, RoleChecker
 
-# Create tables (for local dev; in prod use Alembic)
-models.Base.metadata.create_all(bind=engine)
-
 if os.getenv("TESTING") != "True":
   models.Base.metadata.create_all(bind=engine)
 
@@ -66,6 +63,11 @@ class IncidentRead(BaseModel):
   class Config:
     from_attributes = True
     
+class IncidentUpdate(BaseModel):
+  severity: Optional[str] = None
+  owner_id: Optional[str] = None
+  comment: Optional[str] = None
+
 require_admin = RoleChecker(["ADMIN"])
 require_manager = RoleChecker(["ADMIN", "MANAGER"])
 
@@ -230,3 +232,83 @@ def get_users(db: Session = Depends(get_db)):
     return users
   except Exception as e:
     raise HTTPException(status_code=500, detail=str(e))
+  
+# Update incident details (severity, owner) with audit logging
+@app.patch("/incidents/{incident_id}")
+def update_incident(
+  incident_id: str, 
+  request: IncidentUpdate, 
+  db: Session = Depends(get_db), 
+  current_user: models.User = Depends(require_manager)
+):
+  
+  incident = db.query(models.Incident).filter(models.Incident.id == incident_id).first()
+  if not incident:
+    raise HTTPException(status_code=404, detail="Incident not found")
+  
+  try:
+    # Track changes for audit logging
+    changes = []
+    
+    # Update Severity if provided
+    if request.severity and request.severity != incident.severity:
+      old_sev = incident.severity
+      incident.severity = request.severity
+      changes.append((
+        "SEVERITY_CHANGE", 
+        old_sev, 
+        request.severity
+      ))
+    
+    # Update Owner if provided
+    if request.owner_id and str(request.owner_id) != str(incident.owner_id):
+      old_owner = str(incident.owner_id)
+      incident.owner_id = request.owner_id
+      changes.append((
+        "OWNER_CHANGE", 
+        old_owner, 
+        str(request.owner_id)
+      ))
+    
+    # Create audit logs for each change
+    for change in changes:
+      event_type, old_value, new_value = change
+      audit_log = models.IncidentEvent(
+        incident_id=incident.id,
+        actor_id=current_user.id,
+        event_type=event_type,
+        old_value=old_value,
+        new_value=new_value,
+        comment=request.comment or f"{event_type} from {old_value} to {new_value}"
+      )
+      db.add(audit_log)
+    
+    db.commit()
+    db.refresh(incident)
+    
+  except Exception as e:
+    db.rollback()
+    raise HTTPException(status_code=500, detail=str(e))
+  
+  return {"id": incident.id, "message": "Incident updated successfully"}
+
+# Delete an incident (Admin only)
+@app.delete("/incidents/{incident_id}")
+def delete_incident(
+  incident_id: UUID, 
+  db: Session = Depends(get_db), 
+  current_user: models.User = Depends(require_admin)
+):
+  
+  incident = db.query(models.Incident).filter(models.Incident.id == incident_id).first()
+  if not incident:
+    raise HTTPException(status_code=404, detail="Incident not found")
+  
+  try:
+    db.delete(incident)
+    db.commit()
+  except Exception as e:
+    db.rollback()
+    raise HTTPException(status_code=500, detail=str(e))
+  
+  return {"id": incident_id, "message": "Incident deleted successfully"}

@@ -57,7 +57,7 @@ class Incident(Base):
 
   # Relationships
   owner = relationship("User", back_populates="incidents")
-  events = relationship("IncidentEvent", back_populates="incident", order_by="desc(IncidentEvent.created_at)")
+  events = relationship("IncidentEvent", back_populates="incident", order_by="desc(IncidentEvent.created_at)", cascade="all, delete-orphan")
 
 class IncidentEvent(Base):
   """

@@ -60,15 +60,19 @@ export default function CreateIncidentModal({ onIncidentCreated }: { onIncidentC
       if (res.ok) {
         setOpen(false);
         onIncidentCreated();
-
         // Reset Form
         setTitle("");
         setDesc("");
         setSeverity("SEV4");
         setAssigneeId(currentUser?.id || "");
       } else {
-        const err = await res.json();
-        alert("Failed to create incident: " + err.message);
+        // check for 403 error
+        if (res.status === 403) {
+          alert("You do not have permission to create an incident assigned to another user.");
+        } else {
+          const errorData = await res.json();
+          alert("Error: " + (errorData.message || "Failed to create incident"));
+        }
       }
     } catch (error) {
       console.error("Network error:", error);

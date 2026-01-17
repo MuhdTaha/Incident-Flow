@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowRightLeft, MessageSquare } from "lucide-react";
+import { ArrowRightLeft, MessageSquare, Pencil, Trash2, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { authFetch } from "@/lib/api";
 
@@ -25,6 +25,12 @@ type Incident = {
   title: string;
   status: string;
   allowed_transitions: string[];
+  owner_id: string;
+};
+
+type User = {
+  id: string;
+  full_name: string;
 };
 
 type IncidentActionModalProps = {
@@ -34,16 +40,35 @@ type IncidentActionModalProps = {
   onSuccess: () => void;
 };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
 export default function IncidentActionModal({ incident, isOpen, onClose, onSuccess }: IncidentActionModalProps) {
   const { user } = useAuth();
-  const [actionType, setActionType] = useState<"TRANSITION" | "COMMENT">("TRANSITION");
+
+  // State
+  const [actionType, setActionType] = useState<"TRANSITION" | "COMMENT" | "EDIT">("TRANSITION");
   const [selectedState, setSelectedState] = useState<string>("");
   const [comment, setComment] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
 
-  // Reset state when modal opens/changes incident
+  // Edit Mode States
+  const [severity, setSeverity] = useState<"SEV1" | "SEV2" | "SEV3" | "SEV4">("SEV4");
+  const [ownerId, setOwnerId] = useState<string>("");
+  const [users, setUsers] = useState<User[]>([]);
+
+  // Permissions
+  const isManagerOrAdmin = user?.role === "ADMIN" || user?.role === "MANAGER";
+  const isAdmin = user?.role === "ADMIN";
+
+  // Fetch Users when modal opens (for reassignment)
+  useEffect(() => {
+    if (isOpen) {
+      authFetch("/users")
+        .then((res) => res.json())
+        .then((data) => setUsers(data))
+        .catch((err) => console.error("Failed to fetch users", err));
+    }
+  }, [isOpen]);
+
+  // Reset/Initialize state when incident changes
   useEffect(() => {
     if (incident) {
       // Default to first allowed transition
@@ -87,6 +112,25 @@ export default function IncidentActionModal({ incident, isOpen, onClose, onSucce
           }),
         });
         if (!res.ok) throw new Error("Failed to add comment");
+      } else if (actionType === "EDIT") {
+        // Handle Incident Edit (e.g., Severity or Assignee Change)
+        const res = await authFetch(`/incidents/${incident.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json"},
+          body: JSON.stringify({
+            severity: severity,
+            owner_id: ownerId,
+            comment: comment || "Incident edited via Action Modal",
+          }),
+        });
+
+        if (res.status === 403) {
+          alert("Permission Denied: You cannot edit this incident.");
+          setLoading(false);
+          return;
+        }
+
+        if (!res.ok) throw new Error("Failed to update incident");
       }
 
       onSuccess();
@@ -99,15 +143,43 @@ export default function IncidentActionModal({ incident, isOpen, onClose, onSucce
     }
   };
 
-  const getActionColor = (action: string) => {
-    switch (action) {
-      case "INVESTIGATING": return "bg-blue-600 hover:bg-blue-700";
-      case "MITIGATED": return "bg-emerald-600 hover:bg-emerald-700";
-      case "RESOLVED": return "bg-green-600 hover:bg-green-700";
-      case "CLOSED": return "bg-slate-600 hover:bg-slate-700";
-      case "ESCALATED": return "bg-red-600 hover:bg-red-700";
-      default: return "";
+  const handleDelete = async () => {
+    if (!incident || !user || !isAdmin) return;
+    if (!confirm("Are you sure you want to delete this incident? This action cannot be undone.")) return;
+
+    setLoading(true);
+    try {
+      const res = await authFetch(`/incidents/${incident.id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ actor_id: user.id }),
+      });
+      if (!res.ok) throw new Error("Failed to delete incident");
+      onSuccess();
+      onClose();
+      alert("Incident deleted successfully.");
+    } catch (e) {
+      console.error(e);
+      alert("Failed to delete incident. Please try again.");
+      setLoading(false);
     }
+  }
+
+  const getActionColor = (action: string) => {
+    if (actionType === "TRANSITION") {
+      switch (action) {
+        case "INVESTIGATING": return "bg-blue-600 hover:bg-blue-700";
+        case "MITIGATED": return "bg-emerald-600 hover:bg-emerald-700";
+        case "RESOLVED": return "bg-green-600 hover:bg-green-700";
+        case "CLOSED": return "bg-slate-600 hover:bg-slate-700";
+        case "ESCALATED": return "bg-red-600 hover:bg-red-700";
+        default: return "";
+      }
+    } 
+    if (actionType === "EDIT") {
+      return "bg-purple-600 hover:bg-purple-700";
+    }
+    return "";
   };
 
   if (!incident || !user) return null;
@@ -116,7 +188,7 @@ export default function IncidentActionModal({ incident, isOpen, onClose, onSucce
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Update Incident</DialogTitle>
+          <DialogTitle>Manage Incident</DialogTitle>
           <p className="text-sm text-slate-500">
             {incident.title} <span className="font-mono text-xs">({incident.id.slice(0, 8)})</span>
           </p>
@@ -127,27 +199,36 @@ export default function IncidentActionModal({ incident, isOpen, onClose, onSucce
           <div className="grid gap-2">
             <Label>Action</Label>
             <div className="flex gap-2 flex-wrap">
-              {/* Transition Button */}
               <Button
                 variant={actionType === "TRANSITION" ? "default" : "outline"}
                 className="flex-1 justify-start gap-2"
                 onClick={() => setActionType("TRANSITION")}
                 disabled={incident.allowed_transitions.length === 0}
               >
-                <ArrowRightLeft className="h-4 w-4" /> Change Status
+                <ArrowRightLeft className="h-4 w-4" /> Status
               </Button>
-              {/* Comment Button */}
+              
               <Button
                 variant={actionType === "COMMENT" ? "default" : "outline"}
                 className="flex-1 justify-start gap-2"
                 onClick={() => setActionType("COMMENT")}
               >
-                <MessageSquare className="h-4 w-4" /> Comment Only
+                <MessageSquare className="h-4 w-4" /> Comment
+              </Button>
+
+              <Button
+                variant={actionType === "EDIT" ? "default" : "outline"}
+                className="flex-1 justify-start gap-2"
+                onClick={() => setActionType("EDIT")}
+                disabled={!isManagerOrAdmin}
+                title={!isManagerOrAdmin ? "Only Managers can edit incident details" : ""}
+              >
+                <Pencil className="h-4 w-4" /> Edit
               </Button>
             </div>
           </div>
 
-          {/* Transition Dropdown (Only visible if TRANSITION selected) */}
+          {/* TRANSITION VIEW */}
           {actionType === "TRANSITION" && (
             <div className="grid gap-2">
               <Label>New Status</Label>
@@ -166,11 +247,61 @@ export default function IncidentActionModal({ incident, isOpen, onClose, onSucce
             </div>
           )}
 
+          {/* EDIT VIEW */}
+          {actionType === "EDIT" && (
+            <div className="grid gap-4 p-4 border rounded-md bg-slate-50">
+              <div className="grid gap-2">
+                <Label>Severity Level</Label>
+                <Select value={severity} onValueChange={(value) => setSeverity(value as any)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SEV1">SEV1 (Critical)</SelectItem>
+                    <SelectItem value="SEV2">SEV2 (High)</SelectItem>
+                    <SelectItem value="SEV3">SEV3 (Moderate)</SelectItem>
+                    <SelectItem value="SEV4">SEV4 (Low)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label>Assignee</Label>
+                <Select value={ownerId} onValueChange={setOwnerId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select user..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {users.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.full_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Delete Zone (Admin Only) */}
+              {isAdmin && (
+                <div className="mt-4 pt-4 border-t border-slate-200">
+                  <Button 
+                    variant="destructive" 
+                    className="w-full gap-2"
+                    onClick={handleDelete}
+                    type="button" 
+                  >
+                    <Trash2 className="h-4 w-4" /> Delete Incident (Admin)
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Comment Box */}
           <div className="grid gap-2">
-            <Label>Reasoning / Context</Label>
+            <Label>Reasoning / Context {actionType !== "TRANSITION" && "(Optional)"}</Label>
             <Textarea
-              placeholder="e.g., Checked logs, identified CPU spike. Rolling back..."
+              placeholder={actionType === "EDIT" ? "Why are these details changing?" : "Context for this action..."}
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               className="h-24 resize-none"
@@ -183,7 +314,7 @@ export default function IncidentActionModal({ incident, isOpen, onClose, onSucce
           <Button 
             onClick={handleSubmit} 
             disabled={loading || (actionType === "TRANSITION" && !selectedState)}
-            className={actionType === "TRANSITION" ? getActionColor(selectedState) : ""}
+            className={getActionColor(selectedState)}
           >
             {loading ? "Updating..." : "Confirm Update"}
           </Button>
