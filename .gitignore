@@ -13,3 +13,4 @@ build/
 *.log
 coverage/
 .pytest_cache/
+backend/.coverage
