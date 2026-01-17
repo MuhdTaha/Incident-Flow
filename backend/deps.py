@@ -1,3 +1,4 @@
+# backend/deps.py
 import os
 from typing import List
 from fastapi import Depends, HTTPException, status

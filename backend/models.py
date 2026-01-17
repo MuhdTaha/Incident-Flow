@@ -1,6 +1,6 @@
+# backend/models.py
 import uuid
-from sqlalchemy import Column, String, ForeignKey, DateTime, Enum as SQLEnum, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, String, ForeignKey, DateTime, UUID, Enum as SQLEnum, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
@@ -33,7 +33,7 @@ class UserRole(str, enum.Enum):
 class User(Base):
   __tablename__ = "users"
 
-  id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.uuid_generate_v4())
+  id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
   email = Column(String, unique=True, nullable=False)
   full_name = Column(String, nullable=False)
   role = Column(SQLEnum(UserRole), default=UserRole.ENGINEER, nullable=False)
@@ -46,7 +46,7 @@ class User(Base):
 class Incident(Base):
   __tablename__ = "incidents"
 
-  id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.uuid_generate_v4())
+  id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
   title = Column(String, nullable=False)
   description = Column(Text)
   severity = Column(SQLEnum(IncidentSeverity), nullable=False)
@@ -66,7 +66,7 @@ class IncidentEvent(Base):
   """
   __tablename__ = "incident_events"
 
-  id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.uuid_generate_v4())
+  id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
   incident_id = Column(UUID(as_uuid=True), ForeignKey("incidents.id"), nullable=False)
   actor_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True) # Nullable for system events
   event_type = Column(String, nullable=False) # e.g., 'STATUS_CHANGE', 'COMMENT'
