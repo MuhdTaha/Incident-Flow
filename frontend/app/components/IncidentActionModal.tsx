@@ -55,8 +55,9 @@ export default function IncidentActionModal({ incident, isOpen, onClose, onSucce
   const [users, setUsers] = useState<User[]>([]);
 
   // Permissions
-  const isManagerOrAdmin = user?.role === "ADMIN" || user?.role === "MANAGER";
-  const isAdmin = user?.role === "ADMIN";
+  const userRole = user?.app_metadata.role;
+  const isManagerOrAdmin = userRole === "ADMIN" || userRole === "MANAGER";
+  const isAdmin = userRole === "ADMIN";
 
   // Fetch Users when modal opens (for reassignment)
   useEffect(() => {
@@ -175,9 +176,6 @@ export default function IncidentActionModal({ incident, isOpen, onClose, onSucce
         case "ESCALATED": return "bg-red-600 hover:bg-red-700";
         default: return "";
       }
-    } 
-    if (actionType === "EDIT") {
-      return "bg-purple-600 hover:bg-purple-700";
     }
     return "";
   };
@@ -249,41 +247,44 @@ export default function IncidentActionModal({ incident, isOpen, onClose, onSucce
 
           {/* EDIT VIEW */}
           {actionType === "EDIT" && (
-            <div className="grid gap-4 p-4 border rounded-md bg-slate-50">
-              <div className="grid gap-2">
-                <Label>Severity Level</Label>
-                <Select value={severity} onValueChange={(value) => setSeverity(value as any)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="SEV1">SEV1 (Critical)</SelectItem>
-                    <SelectItem value="SEV2">SEV2 (High)</SelectItem>
-                    <SelectItem value="SEV3">SEV3 (Moderate)</SelectItem>
-                    <SelectItem value="SEV4">SEV4 (Low)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <>
+              <div className="grid gap-4 p-4 border rounded-md bg-slate-50">
+                <div className="grid grid-cols-2 align-center gap-4">
+                  <div className="grid gap-2">
+                    <Label>Severity Level</Label>
+                    <Select value={severity} onValueChange={(value) => setSeverity(value as any)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="SEV1">SEV1 (Critical)</SelectItem>
+                        <SelectItem value="SEV2">SEV2 (High)</SelectItem>
+                        <SelectItem value="SEV3">SEV3 (Moderate)</SelectItem>
+                        <SelectItem value="SEV4">SEV4 (Low)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-              <div className="grid gap-2">
-                <Label>Assignee</Label>
-                <Select value={ownerId} onValueChange={setOwnerId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select user..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {users.map((u) => (
-                      <SelectItem key={u.id} value={u.id}>
-                        {u.full_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <div className="grid gap-2">
+                    <Label>Assignee</Label>
+                    <Select value={ownerId} onValueChange={setOwnerId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select user..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {users.map((u) => (
+                          <SelectItem key={u.id} value={u.id}>
+                            {u.full_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </div>
-
               {/* Delete Zone (Admin Only) */}
               {isAdmin && (
-                <div className="mt-4 pt-4 border-t border-slate-200">
+                <div className="border-slate-200">
                   <Button 
                     variant="destructive" 
                     className="w-full gap-2"
@@ -294,7 +295,7 @@ export default function IncidentActionModal({ incident, isOpen, onClose, onSucce
                   </Button>
                 </div>
               )}
-            </div>
+            </>
           )}
 
           {/* Comment Box */}

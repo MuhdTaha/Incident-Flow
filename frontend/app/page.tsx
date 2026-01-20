@@ -110,7 +110,6 @@ export default function IncidentDashboard() {
     })
     // Add sorting by updated_at descending
     .sort((a, b) => {
-      console.log(a.updated_at, b.updated_at);
       // Convert to Date objects for comparison, replace space with 'T' for proper ISO format
       const dateA = new Date(a.updated_at?.replace(" ", "T")).getTime();
       const dateB = new Date(b.updated_at?.replace(" ", "T")).getTime();

@@ -1,6 +1,7 @@
 # backend/main.py
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, computed_field, Field
 from typing import Optional, List
@@ -71,6 +72,123 @@ class IncidentUpdate(BaseModel):
 require_admin = RoleChecker(["ADMIN"])
 require_manager = RoleChecker(["ADMIN", "MANAGER"])
 
+# --- Admin Schemas ---
+class UserStats(BaseModel):
+  id: UUID
+  full_name: str
+  email: str
+  role: str
+  created_at: datetime
+  incident_count: int # How many incidents they own
+  
+class AdminDashboardStats(BaseModel):
+  total_users: int
+  total_incidents: int
+  active_incidents: int # Status != CLOSED
+  incidents_by_severity: dict # {"SEV1": 5, "SEV2": 2...}
+  users: List[UserStats]
+  
+class RoleUpdate(BaseModel):
+  role: str # "ADMIN", "MANAGER", "ENGINEER"
+
+
+# --- Admin Endpoint ---
+@app.get("/admin/stats", response_model=AdminDashboardStats)
+def get_admin_stats(db: Session = Depends(get_db), current_user: models.User = Depends(require_admin)):
+  # 1. High Level Stats
+  total_users = db.query(models.User).count()
+  total_incidents = db.query(models.Incident).count()
+  active_incidents = db.query(models.Incident).filter(models.Incident.status != models.IncidentStatus.CLOSED).count()
+  
+  # 2. Incidents by Severity
+  sev_counts = db.query(models.Incident.severity, func.count(models.Incident.id)
+  ).group_by(models.Incident.severity).all()
+  
+  # Convert [('SEV1', 5), ('SEV2', 2)] -> {'SEV1': 5, 'SEV2': 2}
+  sev_dict = {sev: count for sev, count in sev_counts}
+  
+  # 3. User Stats with Incident Counts (Outer Join so users with 0 incidents are included)
+  user_data = db.query(
+    models.User,
+    func.count(models.Incident.id).label("incident_count")
+  ).outerjoin(models.Incident, models.User.id == models.Incident.owner_id)\
+    .group_by(models.User.id)\
+    .all()
+    
+  # Format the user stats
+  users_formatted = []
+  
+  for user, incident_count in user_data:
+    users_formatted.append(
+      UserStats(
+        id=user.id,
+        full_name=user.full_name,
+        email=user.email,
+        role=user.role,
+        created_at=user.created_at,
+        incident_count=incident_count
+      )
+    )
+  
+  return AdminDashboardStats(
+    total_users=total_users,
+    total_incidents=total_incidents,
+    active_incidents=active_incidents,
+    incidents_by_severity=sev_dict,
+    users=users_formatted
+  )
+
+@app.patch("/users/{user_id}/role")
+def update_user_role(
+  user_id: UUID,
+  request: RoleUpdate,
+  db: Session = Depends(get_db),
+  current_user: models.User = Depends(require_admin)
+):
+  # 1. Fetch User
+  user = db.query(models.User).filter(models.User.id == user_id).first()
+  if not user:
+    raise HTTPException(status_code=404, detail="User not found")
+
+  # 2. Check if admin is trying to change their own role
+  if user.id == current_user.id:
+    raise HTTPException(status_code=400, detail="Admins cannot change their own role")
+  
+  user.role = request.role
+  db.commit()
+  db.refresh(user)
+  
+  return {"id": user.id, "role": user.role, "message": "Role updated successfully"}
+
+@app.delete("/users/{user_id}")
+def delete_user(
+  user_id: UUID, 
+  db: Session = Depends(get_db),
+  current_user: models.User = Depends(require_admin)
+):
+  # 1. Prevent admin from deleting themselves
+  if user_id == current_user.id:
+    raise HTTPException(status_code=400, detail="Admins cannot delete their own account")
+  
+  # 2. Fetch User
+  user_to_delete = db.query(models.User).filter(models.User.id == user_id).first()
+  if not user_to_delete:
+    raise HTTPException(status_code=404, detail="User not found")
+  
+  try:
+    # 3. Reassign Incidents and Incident Events owned by this user to None
+    db.query(models.Incident).filter(models.Incident.owner_id == user_id).update({models.Incident.owner_id: None})
+    db.query(models.IncidentEvent).filter(models.IncidentEvent.actor_id == user_id).update({models.IncidentEvent.actor_id: None})
+    
+    # 4. Delete User
+    db.delete(user_to_delete)
+    db.commit()
+  except Exception as e:
+    db.rollback()
+    raise HTTPException(status_code=500, detail=str(e))
+  
+  return {"id": user_to_delete.id, "message": "User deleted successfully"}
+  
 # --- Endpoints ---
 
 # Create a new incident with initial audit log

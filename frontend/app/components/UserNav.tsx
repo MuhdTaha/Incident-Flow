@@ -19,16 +19,20 @@ export default function UserNav() {
 
   if (!user) return null;
 
-  const initials = user.user_metadata?.full_name?.[0] || user.email?.[0] || "U";
+  const names = user.user_metadata?.full_name?.split(" ").filter((n: string) => n) || [];
+  const initials = names.length > 0
+    ? (names[0][0] + (names.length > 1 ? names[names.length - 1][0] : "")).toUpperCase()
+    : "U";
+  const role = user.app_metadata.role? user.app_metadata.role : "User";
 
   return (
     <div className="relative">
       <Button
         variant="ghost"
-        className="flex items-center gap-2 pl-2 pr-4 rounded-full hover:bg-slate-200 transition-colors"
+        className="flex items-center gap-2 pl-4 pr-5 pt-7 pb-7 rounded-full hover:bg-slate-200 transition-colors"
         onClick={() => setIsOpen(!isOpen)}
       >
-        <div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold">
+        <div className="h-10 w-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold">
           {initials}
         </div>
         <div className="text-left hidden md:block">
@@ -37,6 +41,9 @@ export default function UserNav() {
           </div>
           <div className="text-[10px] text-slate-500 leading-none mt-1">
             {user.email}
+          </div>
+          <div className="text-[10px] text-slate-500 leading-none mt-1">
+            {role || "User"}
           </div>
         </div>
       </Button>
@@ -52,7 +59,7 @@ export default function UserNav() {
           <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg border border-slate-100 z-50 py-1 animate-in fade-in zoom-in duration-75">
             <div className="px-4 py-3 border-b border-slate-100">
               <p className="text-sm font-medium text-slate-900">
-                {user.user_metadata?.full_name || "User"}
+                {user.user_metadata?.full_name || "User"} ({role})
               </p>
               <p className="text-xs text-slate-500 truncate">{user.email}</p>
             </div>
