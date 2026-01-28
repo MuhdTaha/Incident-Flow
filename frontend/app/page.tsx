@@ -154,8 +154,8 @@ export default function IncidentDashboard() {
       </div>
 
       {/* Main Content */}
-      <Card className="shadow-md border-slate-200">
-        <CardHeader className="border-b bg-white">
+      <Card className="shadow-md border-slate-200 gap-0 py-0 overflow-hidden">
+        <CardHeader className="border-b bg-white pt-6">
           <CardTitle className="text-lg font-semibold text-slate-800">Incident Queue</CardTitle>
         </CardHeader>
         <CardContent className="p-0 bg-white">

@@ -7,6 +7,7 @@ from pydantic import BaseModel, computed_field, Field
 from typing import Optional, List
 from database import get_db, engine
 from uuid import UUID
+from tasks import send_incident_alert_email
 import models
 import os
 from datetime import datetime
@@ -213,7 +214,7 @@ def create_incident(
     new_incident = models.Incident(
       title=incident.title,
       description=incident.description,
-      severity=incident.severity,
+      severity=incident.severity.value,
       owner_id=final_owner_id,
       status=models.IncidentStatus.DETECTED
     )
@@ -234,6 +235,14 @@ def create_incident(
     
     db.add(audit_log)
     db.commit()
+    
+    # 3. Send Async Email Notification to Owner
+    send_incident_alert_email.delay(
+      to_email="mohd.taha75@gmail.com",
+      incident_title=new_incident.title,
+      incident_id=str(new_incident.id),
+      severity=str(new_incident.severity)
+    )
     
     return {"id": str(new_incident.id), "message": "Incident created successfully"}
   

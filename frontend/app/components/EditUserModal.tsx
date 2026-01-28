@@ -48,6 +48,12 @@ export default function EditUserModal({ user, isOpen, onClose, onSuccess }: Edit
 
   const handleUpdateRole = async () => {
     if (!user) return;
+
+    if (role === user.role) {
+      onClose();
+      return;
+    }
+    
     setLoading(true);
     try {
       const res = await authFetch(`/users/${user.id}/role`, {

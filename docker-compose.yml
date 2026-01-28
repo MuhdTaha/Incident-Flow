@@ -14,14 +14,40 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/incidentflow
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - SMTP_HOST=mailhog
+      - SMTP_PORT=1025
     volumes:
       - ./backend:/app       # mount backend code for live reload
     # Use --reload for development; remove in production
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
-  # 2. Frontend Service
+  # 2. Worker Service (Celery)
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: incidentflow-worker
+    env_file: 
+      - ./backend/.env
+    depends_on:
+      - backend
+      - redis
+      - mailhog
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/incidentflow
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - SMTP_HOST=mailhog
+      - SMTP_PORT=1025
+    volumes:
+      - ./backend:/app       # mount backend code for live reload
+    command: celery -A celery_app.celery worker --loglevel=info
+
+  # 3. Frontend Service
   frontend:
     build:
       context: ./frontend
@@ -42,7 +68,7 @@ services:
       - frontend_next:/app/.next
     command: npm run dev
 
-  # 3. Database Service
+  # 4. Database Service
   db:
     image: postgres:15-alpine
     container_name: incidentflow-db
@@ -61,6 +87,39 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+  
+  # 5. Redis Service
+  redis:
+    image: redis:7-alpine
+    container_name: incidentflow-redis
+    ports:
+      - "6379:6379"
+
+  # 6. Mailhog Service
+  mailhog:
+    image: mailhog/mailhog
+    container_name: incidentflow-mailhog
+    ports:
+      - "1025:1025" # SMTP port
+      - "8025:8025" # Web UI port
+
+  # 7. Celery Beat (The Scheduler)
+  beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: incidentflow-beat
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - redis
+      - db
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/incidentflow
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    volumes:
+      - ./backend:/app       # mount backend code for live reload
+    command: celery -A celery_app.celery beat --loglevel=info
 
 volumes:
   postgres_data:

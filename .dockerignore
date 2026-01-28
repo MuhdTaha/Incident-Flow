@@ -1,6 +1,23 @@
+# Dependencies
 node_modules
 venv
+
+# Python/Celery Runtime
 __pycache__
+*.pyc
+backend/celerybeat-schedule
+
+# Git & Secrets
 .git
 .env
+
+# Build Artifacts
 .next
+build
+dist
+
+# IDE/System
+.vscode
+.idea
+.DS_Store
+*.log

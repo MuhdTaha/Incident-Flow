@@ -26,6 +26,7 @@ class UserRole(str, enum.Enum):
   ENGINEER = "ENGINEER"
   MANAGER = "MANAGER"
   ADMIN = "ADMIN"
+  BOT = "BOT"
 
 
 # --- Models ---
