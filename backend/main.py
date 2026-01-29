@@ -10,9 +10,11 @@ from uuid import UUID
 from tasks import send_incident_alert_email
 import models
 import os
+import time
 from datetime import datetime
 from fsm import can_transition, IncidentStatus, VALID_TRANSITIONS
 from deps import get_current_user, RoleChecker
+from storage import create_presigned_post, BUCKET_NAME, S3_EXTERNAL_ENDPOINT
 
 if os.getenv("TESTING") != "True":
   models.Base.metadata.create_all(bind=engine)
@@ -72,6 +74,25 @@ class IncidentUpdate(BaseModel):
 
 require_admin = RoleChecker(["ADMIN"])
 require_manager = RoleChecker(["ADMIN", "MANAGER"])
+
+# --- Attachment Upload Schemas ---
+class AttachmentSignRequest(BaseModel):
+  file_name: str
+  file_type: str
+
+class AttachmentCompleteRequest(BaseModel):
+  file_name: str
+  file_key: str
+
+class AttachmentRead(BaseModel):
+  id: UUID
+  file_name: str
+  file_url: str
+  uploaded_by: str
+  created_at: datetime
+  
+  class Config:
+    from_attributes = True
 
 # --- Admin Schemas ---
 class UserStats(BaseModel):
@@ -439,3 +460,87 @@ def delete_incident(
     raise HTTPException(status_code=500, detail=str(e))
   
   return {"id": incident_id, "message": "Incident deleted successfully"}
+
+# --- Attachment Upload Endpoints ---
+
+# 1. Get Presigned URL (Step 1 of Upload)
+@app.post("/incidents/{incident_id}/attachments/sign", response_model=dict)
+def sign_attachment_upload(
+  incident_id: UUID,
+  request: AttachmentSignRequest,
+  current_user: models.User = Depends(get_current_user)
+):
+  
+  # Create a unique object path key: incidents/{id}/{timestamp}_{filename}
+  clean_filename = request.file_name.replace(" ", "_")
+  file_key = f"incidents/{incident_id}/{int(time.time())}_{clean_filename}"
+  
+  presigned_data = create_presigned_post(file_key)
+  if not presigned_data:
+    raise HTTPException(status_code=500, detail="Failed to generate presigned URL")
+  
+  return {
+    "data": presigned_data,
+    "file_key": file_key,
+  }
+
+# 2. Confirm Upload & Save to DB (Step 2 of Upload)
+@app.post("/incidents/{incident_id}/attachments/complete", response_model=AttachmentRead)
+def add_attachment(
+  incident_id: UUID,
+  request: AttachmentCompleteRequest,
+  db: Session = Depends(get_db),
+  current_user: models.User = Depends(get_current_user)
+):
+  incident = db.query(models.Incident).filter(models.Incident.id == incident_id).first()
+  if not incident:
+    raise HTTPException(status_code=404, detail="Incident not found")
+  
+  # Create a DB Record for the attachment
+  attachment = models.IncidentAttachment(
+    incident_id=incident_id,
+    file_name=request.file_name,
+    file_key=request.file_key,
+    uploaded_by=current_user.id
+  )
+  
+  db.add(attachment)
+  db.commit()
+  db.refresh(attachment)
+  
+  # Construct a public URL for the uploaded file
+  file_url = f"{S3_EXTERNAL_ENDPOINT}/{BUCKET_NAME}/{request.file_key}"
+  
+  return {
+    "id": attachment.id,
+    "file_name": attachment.file_name,
+    "file_url": file_url,
+    "uploaded_by": current_user.full_name,
+    "created_at": attachment.created_at
+  }
+  
+# 3. List Attachments for an Incident
+@app.get("/incidents/{incident_id}/attachments", response_model=List[AttachmentRead])
+def get_attachments(
+  incident_id: UUID,
+  db: Session = Depends(get_db)
+):
+  attachments = db.query(models.IncidentAttachment)\
+    .filter(models.IncidentAttachment.incident_id == incident_id)\
+    .all()
+  
+  # Format response with full file URLs
+  results = []
+  for att in attachments:
+    uploader = db.query(models.User).filter(models.User.id == att.uploaded_by).first()
+    uploader_name = uploader.full_name if uploader else "Unknown"
+    
+    results.append({
+      "id": att.id,
+      "file_name": att.file_name,
+      "file_url": f"{S3_EXTERNAL_ENDPOINT}/{BUCKET_NAME}/{att.file_key}",
+      "uploaded_by": uploader_name,
+      "created_at": att.created_at
+    })
+    
+  return results

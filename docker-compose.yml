@@ -52,6 +52,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      target: dev
       args:
         NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
         NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY}
@@ -60,6 +61,7 @@ services:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - INTERNAL_API_URL=http://backend:8000
     depends_on:
       - backend
     volumes:
@@ -120,8 +122,42 @@ services:
     volumes:
       - ./backend:/app       # mount backend code for live reload
     command: celery -A celery_app.celery beat --loglevel=info
+  
+  # 8. MinIO Object Storage
+  minio:
+    image: minio/minio
+    container_name: incidentflow-minio
+    ports:
+      - "9000:9000" # MinIO API port
+      - "9001:9001" # Console UI port
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001" 
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # 9. MinIO Bucket Creator
+  createbuckets:
+    image: minio/mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set myminio http://minio:9000 minioadmin minioadmin;
+      /usr/bin/mc mb myminio/incident-attachments;
+      /usr/bin/mc anonymous set public myminio/incident-attachments;
+      exit 0;
+      "
 
 volumes:
   postgres_data:
   frontend_node_modules:
   frontend_next:
+  minio_data:

@@ -59,6 +59,7 @@ class Incident(Base):
   # Relationships
   owner = relationship("User", back_populates="incidents")
   events = relationship("IncidentEvent", back_populates="incident", order_by="desc(IncidentEvent.created_at)", cascade="all, delete-orphan")
+  attachments = relationship("IncidentAttachment", back_populates="incident", cascade="all, delete-orphan")
 
 class IncidentEvent(Base):
   """
@@ -79,4 +80,16 @@ class IncidentEvent(Base):
   # Relationships
   incident = relationship("Incident", back_populates="events")
   actor = relationship("User", back_populates="actions")
+
+class IncidentAttachment(Base):
+  __tablename__ = "incident_attachments"
   
+  id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+  incident_id = Column(UUID(as_uuid=True), ForeignKey("incidents.id"), nullable=False)
+  file_name = Column(String, nullable=False)
+  file_key = Column(String, unique=True, nullable=False) # S3/MinIO object path
+  uploaded_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+  created_at = Column(DateTime(timezone=True), server_default=func.now())
+  
+  # Relationships
+  incident = relationship("Incident", back_populates="attachments")
