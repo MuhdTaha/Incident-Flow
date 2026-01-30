@@ -7,7 +7,8 @@ import {
   FileText, 
   UploadCloud, 
   X, 
-  Download, 
+  Download,
+  ExternalLink, 
   Trash2, 
   Image as ImageIcon,
   Loader2,
@@ -32,6 +33,7 @@ export default function AttachmentManager({ incidentId }: { incidentId: string }
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   if (!user) return null;
   const name = user.user_metadata?.full_name?.split(" ").filter((n: string) => n) || [];
@@ -43,7 +45,7 @@ export default function AttachmentManager({ incidentId }: { incidentId: string }
       const res = await authFetch(`/incidents/${incidentId}/attachments`);
       if (!res.ok) throw new Error("Failed to fetch attachments");
       const data = await res.json();
-      setAttachments(data.attachments || []);
+      setAttachments(data || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -103,10 +105,43 @@ export default function AttachmentManager({ incidentId }: { incidentId: string }
     }, 1000);
   };
 
+  const handleDownload = async (url: string, filename: string) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (e) {
+      console.error("Download failed", e);
+      window.open(url, "_blank");
+    }
+  };
+
   const handleDelete = async (attId: string) => {
     if(!confirm("Delete this attachment?")) return;
-    // TODO: implement DELETE endpoint here
-    alert("Delete feature coming in next phase (requires API endpoint)");
+    setDeletingId(attId);
+    
+    try {
+      const res = await authFetch(`/incidents/${incidentId}/attachments/${attId}`, {
+        method: "DELETE"
+      });
+      
+      if (!res.ok) throw new Error("Failed to delete attachment");
+      
+      setAttachments(prev => prev.filter(a => a.id !== attId));
+    } catch (e) {
+      console.error(e);
+      alert("Failed to delete attachment");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   // Helper to choose icon based on extension
@@ -193,26 +228,34 @@ export default function AttachmentManager({ incidentId }: { incidentId: string }
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {attachments.map((att) => (
-              <Card key={att.id} className="p-3 flex items-center justify-between group hover:border-blue-300 transition-colors">
-                <div className="flex items-center gap-3 overflow-hidden">
-                  <div className="shrink-0">
-                    {getFileIcon(att.file_name)}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate" title={att.file_name}>
-                      {att.file_name}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      by {att.uploaded_by} • {new Date(att.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
+              <Card key={att.id} className="p-3 flex items-center gap-3 group hover:border-blue-300 transition-colors">
+                <div className="shrink-0">
+                  {getFileIcon(att.file_name)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-900 truncate" title={att.file_name}>
+                    {att.file_name}
+                  </p>
+                  <p className="text-xs text-slate-500 truncate">
+                    by {att.uploaded_by} • {new Date(att.created_at).toLocaleDateString()}
+                  </p>
                 </div>
                 
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 shrink-0">
                   <Button variant="ghost" size="icon" asChild>
-                    <a href={att.file_url} target="_blank" rel="noopener noreferrer" title="Download">
-                      <Download className="h-4 w-4 text-slate-500" />
+                    <a href={att.file_url} target="_blank" rel="noopener noreferrer" title="View">
+                      <ExternalLink className="h-4 w-4 text-slate-500" />
                     </a>
+                  </Button>
+
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => handleDownload(att.file_url, att.file_name)}
+                    className="text-green-500 hover:text-green-600 hover:bg-green-50 cursor-pointer"
+                    title="Download"
+                  >
+                    <Download className="h-4 w-4 text-green-500" />
                   </Button>
                   
                   {(role === 'ADMIN' || name.includes(att.uploaded_by)) && (
@@ -220,10 +263,15 @@ export default function AttachmentManager({ incidentId }: { incidentId: string }
                         variant="ghost" 
                         size="icon" 
                         onClick={() => handleDelete(att.id)}
-                        className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                        disabled={deletingId === att.id}
+                        className="text-red-500 hover:text-red-600 hover:bg-red-50 cursor-pointer"
                         title="Delete"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      {deletingId === att.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
                     </Button>
                   )}
                 </div>

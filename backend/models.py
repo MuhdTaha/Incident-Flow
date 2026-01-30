@@ -55,6 +55,7 @@ class Incident(Base):
   owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
   created_at = Column(DateTime(timezone=True), server_default=func.now())
   updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+  resolved_at = Column(DateTime(timezone=True), nullable=True)
 
   # Relationships
   owner = relationship("User", back_populates="incidents")

@@ -33,7 +33,7 @@ export function useFileUpload(): UseFileUploadReturn {
       const signRes = await authFetch(`/incidents/${incidentId}/attachments/sign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: file.name, file_type: file.type }),
+        body: JSON.stringify({ file_name: file.name, file_type: file.type }),
       });
 
       if (!signRes.ok) throw new Error('Failed to get presigned URL');
@@ -83,7 +83,7 @@ export function useFileUpload(): UseFileUploadReturn {
       // --- STEP 3: CONFIRMING ---
       setStatus("SAVING");
 
-      const confirmRes = await authFetch(`/incidents/{incidentId}/attachments`, {
+      const confirmRes = await authFetch(`/incidents/${incidentId}/attachments/complete`, {
         method: 'POST',
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

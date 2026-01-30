@@ -34,12 +34,13 @@ type Event = {
 type IncidentHistoryProps = {
   incidentId: string | null;
   incidentTitle: string;
+  incidentDescription: string;
   incidentSeverity: string;
   isOpen: boolean;
   onClose: () => void;
 }
 
-export default function IncidentHistory({ incidentId, incidentTitle, incidentSeverity, isOpen, onClose }
+export default function IncidentHistory({ incidentId, incidentTitle, incidentDescription, incidentSeverity, isOpen, onClose }
   : IncidentHistoryProps) {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(false);
@@ -75,9 +76,9 @@ export default function IncidentHistory({ incidentId, incidentTitle, incidentSev
     <Sheet open={isOpen} onOpenChange={onClose}>
       <SheetContent className="w-full sm:max-w-xl overflow-y-auto sm:p-0">
         
-        {/* Fixed Header */}
-        <div className="p-6 pb-2 bg-white sticky top-0 z-10 border-b">
-            <SheetHeader className="mb-4">
+        {/* Header */}
+        <div className="p-6 bg-white sticky top-0 z-10 border-b">
+            <SheetHeader className="mb-0">
             <SheetTitle className="text-xl font-bold text-slate-900">Incident Details</SheetTitle>
             <SheetDescription>
                 Manage incident context and files.
@@ -93,6 +94,9 @@ export default function IncidentHistory({ incidentId, incidentTitle, incidentSev
                 {incidentSeverity}
                 </Badge>
             </div>
+            <p className="text-sm text-slate-600">
+                {incidentDescription || <span className="italic text-slate-400">No description provided.</span>}
+            </p>
             </SheetHeader>
         </div>
 

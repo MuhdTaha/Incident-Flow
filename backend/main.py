@@ -1,7 +1,7 @@
 # backend/main.py
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, computed_field, Field
 from typing import Optional, List
@@ -11,10 +11,10 @@ from tasks import send_incident_alert_email
 import models
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from fsm import can_transition, IncidentStatus, VALID_TRANSITIONS
 from deps import get_current_user, RoleChecker
-from storage import create_presigned_post, BUCKET_NAME, S3_EXTERNAL_ENDPOINT
+from storage import create_presigned_post, BUCKET_NAME, S3_EXTERNAL_ENDPOINT, get_s3_client
 
 if os.getenv("TESTING") != "True":
   models.Base.metadata.create_all(bind=engine)
@@ -118,7 +118,7 @@ class RoleUpdate(BaseModel):
 @app.get("/admin/stats", response_model=AdminDashboardStats)
 def get_admin_stats(db: Session = Depends(get_db), current_user: models.User = Depends(require_admin)):
   # 1. High Level Stats
-  total_users = db.query(models.User).count()
+  total_users = db.query(models.User).filter(models.User.role != "BOT").count()
   total_incidents = db.query(models.Incident).count()
   active_incidents = db.query(models.Incident).filter(models.Incident.status != models.IncidentStatus.CLOSED).count()
   
@@ -133,7 +133,8 @@ def get_admin_stats(db: Session = Depends(get_db), current_user: models.User = D
   user_data = db.query(
     models.User,
     func.count(models.Incident.id).label("incident_count")
-  ).outerjoin(models.Incident, models.User.id == models.Incident.owner_id)\
+  ).filter(models.User.role != "BOT")\
+  .outerjoin(models.Incident, models.User.id == models.Incident.owner_id)\
     .group_by(models.User.id)\
     .all()
     
@@ -159,6 +160,38 @@ def get_admin_stats(db: Session = Depends(get_db), current_user: models.User = D
     incidents_by_severity=sev_dict,
     users=users_formatted
   )
+  
+@app.get("/admin/analytics")
+def get_analytics(db: Session = Depends(get_db), current_user: models.User = Depends(require_admin)):
+  # 1. MTTR Calculation (Mean Time to Resolve in hours)
+  mttr_query = text("""
+    SELECT AVG(EXTRACT(EPOCH FROM (resolved_at - created_at))) 
+    FROM incidents 
+    WHERE resolved_at IS NOT NULL
+  """)
+  
+  avg_seconds = db.execute(mttr_query).scalar() or 0
+  avg_hours = round(avg_seconds / 3600, 1)
+  
+  # 2. Incidents Volume (Last 7 days)
+  # Groups incidents by date to populate the Line Chart
+  seven_days_ago = datetime.utcnow() - timedelta(days=7)
+  daily_counts = db.query(
+    func.date(models.Incident.created_at).label('date'),
+    func.count(models.Incident.id)
+  ).filter(models.Incident.created_at >= seven_days_ago)\
+    .group_by('date')\
+    .order_by('date')\
+    .all()
+    
+  # Format for Frontend [{"date": "2023-10-01", "count": 5}, ...]
+  volume_trend = [{"date": str(day), "count": count} for day, count in daily_counts]
+  
+  return {
+    "mttr_hours": avg_hours,
+    "volume_trend": volume_trend
+  }
+
 
 @app.patch("/users/{user_id}/role")
 def update_user_role(
@@ -298,6 +331,11 @@ def transition_incident(
   # We prepare both the update and the audit log before committing.
   try:
     old_state = incident.status
+    
+    # Handle Resultion Timestamp
+    if request.new_state in [IncidentStatus.RESOLVED, IncidentStatus.CLOSED]:
+      if not incident.resolved_at:
+        incident.resolved_at = datetime.utcnow()
     
     # A. Update the Source of Truth
     incident.status = request.new_state
@@ -544,3 +582,37 @@ def get_attachments(
     })
     
   return results
+
+# 4. Delete Attachment
+@app.delete("/incidents/{incident_id}/attachments/{attachment_id}")
+def delete_attachment(
+  incident_id: UUID,
+  attachment_id: UUID,
+  db: Session = Depends(get_db),
+  current_user: models.User = Depends(get_current_user)
+):
+  attachment = db.query(models.IncidentAttachment).filter(
+    models.IncidentAttachment.id == attachment_id,
+    models.IncidentAttachment.incident_id == incident_id
+  ).first()
+  
+  if not attachment:
+    raise HTTPException(status_code=404, detail="Attachment not found")
+  
+  if current_user.role != "ADMIN" and attachment.uploaded_by != current_user.id:
+    raise HTTPException(status_code=403, detail="Not authorized to delete this attachment")
+  
+  try:
+    try:
+      s3_client = get_s3_client()
+      s3_client.delete_object(Bucket=BUCKET_NAME, Key=attachment.file_key)
+    except Exception as e:
+      print(f"⚠️ Warning: Failed to delete file from MinIO: {e}")
+    
+    db.delete(attachment)
+    db.commit()
+  except Exception as e:
+    db.rollback()
+    raise HTTPException(status_code=500, detail=str(e))
+    
+  return {"id": attachment_id, "message": "Attachment deleted successfully"}

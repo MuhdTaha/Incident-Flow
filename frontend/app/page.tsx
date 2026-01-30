@@ -231,6 +231,7 @@ export default function IncidentDashboard() {
       <IncidentHistory 
         incidentId={selectedIncidentId} 
         incidentTitle={selectedIncident?.title || ""}
+        incidentDescription={selectedIncident?.description || ""}
         incidentSeverity={selectedIncident?.severity || ""}
         isOpen={!!selectedIncidentId} 
         onClose={() => setSelectedIncidentId(null)} 

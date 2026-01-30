@@ -20,3 +20,4 @@ frontend/.turbo/
 frontend/out/
 frontend/.vercel/
 frontend/vercel.json
+.editorconfig

@@ -27,6 +27,7 @@ import { Users, Activity, AlertTriangle, ShieldAlert, Settings } from "lucide-re
 import { useRouter } from "next/navigation";
 import EditUserModal from "../components/EditUserModal";
 import { Button } from "@/components/ui/button";
+import MetricsDashboard from "../components/MetricsDashboard";
 
 type UserStat = {
   id: string;
@@ -96,6 +97,12 @@ export default function AdminDashboard() {
         <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-medium">
           Organization View
         </span>
+      </div>
+
+      {/* Analytics Section */}
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold text-slate-900">Performance Metrics</h2>
+        <MetricsDashboard />
       </div>
 
       {/* KPI Cards */}
