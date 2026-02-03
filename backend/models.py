@@ -1,4 +1,5 @@
 # backend/models.py
+from os import name
 import uuid
 from sqlalchemy import Column, String, ForeignKey, DateTime, UUID, Enum as SQLEnum, Text
 from sqlalchemy.orm import relationship
@@ -37,8 +38,9 @@ class User(Base):
   id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
   email = Column(String, unique=True, nullable=False)
   full_name = Column(String, nullable=False)
-  role = Column(SQLEnum(UserRole), default=UserRole.ENGINEER, nullable=False)
+  role = Column(SQLEnum(UserRole, name="user_role"), default=UserRole.ENGINEER, nullable=False)
   created_at = Column(DateTime(timezone=True), server_default=func.now())
+  phone_number = Column(String, nullable=True)
 
   # Relationships
   incidents = relationship("Incident", back_populates="owner")
@@ -50,8 +52,8 @@ class Incident(Base):
   id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
   title = Column(String, nullable=False)
   description = Column(Text)
-  severity = Column(SQLEnum(IncidentSeverity), nullable=False)
-  status = Column(SQLEnum(IncidentStatus), default=IncidentStatus.DETECTED, nullable=False)
+  severity = Column(SQLEnum(IncidentSeverity, name="incident_severity"), nullable=False)
+  status = Column(SQLEnum(IncidentStatus, name="incident_status"), default=IncidentStatus.DETECTED, nullable=False)
   owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
   created_at = Column(DateTime(timezone=True), server_default=func.now())
   updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

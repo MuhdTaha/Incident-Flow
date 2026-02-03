@@ -16,8 +16,9 @@ from fsm import can_transition, IncidentStatus, VALID_TRANSITIONS
 from deps import get_current_user, RoleChecker
 from storage import create_presigned_post, BUCKET_NAME, S3_EXTERNAL_ENDPOINT, get_s3_client
 
-if os.getenv("TESTING") != "True":
-  models.Base.metadata.create_all(bind=engine)
+# No need to create tables here as Alembic handles migrations
+# if os.getenv("TESTING") != "True":
+#   models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 app.add_middleware(
