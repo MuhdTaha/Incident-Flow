@@ -1,4 +1,5 @@
 # backend/models.py
+from datetime import datetime
 from os import name
 import uuid
 from sqlalchemy import Column, String, ForeignKey, DateTime, UUID, Enum as SQLEnum, Text
@@ -32,6 +33,17 @@ class UserRole(str, enum.Enum):
 
 # --- Models ---
 
+class Organization(Base):
+  __tablename__ = "organizations"
+  id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+  name = Column(String, unique=True)
+  slug = Column(String, unique=True, index=True) # e.g., "acme-corp"
+  created_at = Column(DateTime(timezone=True), server_default=func.now())
+  
+  # Relationships
+  users = relationship("User", back_populates="organization")
+  incidents = relationship("Incident", back_populates="organization")
+
 class User(Base):
   __tablename__ = "users"
 
@@ -41,10 +53,12 @@ class User(Base):
   role = Column(SQLEnum(UserRole, name="user_role"), default=UserRole.ENGINEER, nullable=False)
   created_at = Column(DateTime(timezone=True), server_default=func.now())
   phone_number = Column(String, nullable=True)
+  organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"))
 
   # Relationships
   incidents = relationship("Incident", back_populates="owner")
   actions = relationship("IncidentEvent", back_populates="actor")
+  organization = relationship("Organization", back_populates="users")
 
 class Incident(Base):
   __tablename__ = "incidents"
@@ -58,11 +72,14 @@ class Incident(Base):
   created_at = Column(DateTime(timezone=True), server_default=func.now())
   updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
   resolved_at = Column(DateTime(timezone=True), nullable=True)
+  organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"))
 
   # Relationships
   owner = relationship("User", back_populates="incidents")
   events = relationship("IncidentEvent", back_populates="incident", order_by="desc(IncidentEvent.created_at)", cascade="all, delete-orphan")
   attachments = relationship("IncidentAttachment", back_populates="incident", cascade="all, delete-orphan")
+  organization = relationship("Organization", back_populates="incidents")
+
 
 class IncidentEvent(Base):
   """
@@ -79,6 +96,7 @@ class IncidentEvent(Base):
   new_value = Column(String)
   comment = Column(Text)
   created_at = Column(DateTime(timezone=True), server_default=func.now())
+  organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"))
 
   # Relationships
   incident = relationship("Incident", back_populates="events")
@@ -93,6 +111,7 @@ class IncidentAttachment(Base):
   file_key = Column(String, unique=True, nullable=False) # S3/MinIO object path
   uploaded_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
   created_at = Column(DateTime(timezone=True), server_default=func.now())
+  organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"))
   
   # Relationships
   incident = relationship("Incident", back_populates="attachments")

@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
-import { User, Settings, LogOut } from "lucide-react";
+import { User, Settings, LogOut,LayoutDashboard } from "lucide-react";
+import Link from "next/link";
 
 export default function UserNav() {
   const { user } = useAuth();
@@ -65,18 +66,24 @@ export default function UserNav() {
             </div>
 
             <div className="py-1">
-              <button className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors">
+              <button className="cursor-pointer w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors">
                 <User className="h-4 w-4" /> Profile
               </button>
-              <button className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors">
+              <button className="cursor-pointer w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors">
                 <Settings className="h-4 w-4" /> Settings
+              </button>
+              <button className="cursor-pointer w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors">
+                <Link href="/admin" className="cursor-pointer w-full flex items-center">
+                  <LayoutDashboard className="mr-2 h-4 w-4" />
+                  <span>Admin Console</span>
+                </Link>
               </button>
             </div>
 
             <div className="border-t border-slate-100 py-1">
               <button
                 onClick={handleLogout}
-                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                className="cursor-pointer w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
               >
                 <LogOut className="h-4 w-4" /> Sign out
               </button>

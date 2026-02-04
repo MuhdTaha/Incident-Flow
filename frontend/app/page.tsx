@@ -27,12 +27,13 @@ import {
   LogOut,
   Settings,
   Search,
-  Filter
+  Filter,
+  Building2,
 } from "lucide-react";
 import IncidentHistory from "./components/IncidentHistory";
 import CreateIncidentModal from "./components/CreateIncidentModal";
 import IncidentActionModal from "./components/IncidentActionModal";
-import UserNav from "./components/UserNav";
+import AppHeader from "./components/AppHeader";
 import IncidentStats from "./components/IncidentStats";
 import { IncidentFilters, FilterState } from "./components/IncidentFilters";
 import { getSevStyles, getStatusIcon } from "@/lib/incident-utils";
@@ -120,21 +121,7 @@ export default function IncidentDashboard() {
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8 bg-slate-50/50 min-h-screen">
       {/* Header Section */}
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-200/60">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <h1 className="text-4xl font-extrabold tracking-tight text-slate-900">
-              IncidentFlow
-            </h1>
-          </div>
-          <p className="text-m font-medium text-slate-500 pl-3">
-            Real-time system health and response
-          </p>
-        </div>
-
-        {/* User Navigation */}
-        <UserNav />
-      </header>
+      <AppHeader />
       
       {/* Summary Stat Cards */}
       <IncidentStats incidents={incidents} />

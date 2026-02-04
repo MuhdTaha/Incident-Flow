@@ -25,9 +25,10 @@ import {
 } from "@/components/ui/select";
 import { Users, Activity, AlertTriangle, ShieldAlert, Settings } from "lucide-react";
 import { useRouter } from "next/navigation";
-import EditUserModal from "../components/EditUserModal";
 import { Button } from "@/components/ui/button";
+import EditUserModal from "../components/EditUserModal";
 import MetricsDashboard from "../components/MetricsDashboard";
+import AppHeader from "../components/AppHeader";
 
 type UserStat = {
   id: string;
@@ -92,6 +93,10 @@ export default function AdminDashboard() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-8">
+      {/* Header Section */}
+      <AppHeader />
+
+      {/* Title Section */}
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight text-slate-900">Admin Console</h1>
         <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-medium">

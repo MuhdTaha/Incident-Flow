@@ -6,6 +6,7 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 from sqlalchemy.orm import Session
 from database import get_db
+from uuid import UUID
 import models
 from dotenv import load_dotenv
 
@@ -48,6 +49,15 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     raise credentials_exception
       
   return user
+
+# --- Organization Checker ---
+def get_current_org_id(current_user: models.User = Depends(get_current_user)) -> UUID:
+  """
+  Ensures the user belongs to an organization.
+  """
+  if not current_user.organization_id:
+    raise HTTPException(status_code=403, detail="User is not part of an organization")
+  return current_user.organization_id
 
 # --- Role Checker Factory ---
 class RoleChecker:

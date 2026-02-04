@@ -13,7 +13,7 @@ import os
 import time
 from datetime import datetime, timedelta
 from fsm import can_transition, IncidentStatus, VALID_TRANSITIONS
-from deps import get_current_user, RoleChecker
+from deps import get_current_org_id, get_current_user, RoleChecker
 from storage import create_presigned_post, BUCKET_NAME, S3_EXTERNAL_ENDPOINT, get_s3_client
 
 # No need to create tables here as Alembic handles migrations
@@ -114,18 +114,46 @@ class AdminDashboardStats(BaseModel):
 class RoleUpdate(BaseModel):
   role: str # "ADMIN", "MANAGER", "ENGINEER"
 
+# --- Organization Profile ---
+class OrgProfile(BaseModel):
+  id: UUID
+  name: str
+  slug: str
+  
+  class Config:
+    from_attributes = True
+    
+@app.get("/organization", response_model=OrgProfile)
+def get_org_profile(
+  db: Session = Depends(get_db),
+  current_user: models.User = Depends(get_current_user),
+):
+  if not current_user.organization_id:
+    raise HTTPException(status_code=404, detail="User is not part of an organization")
+
+  org = db.query(models.Organization).filter(models.Organization.id == current_user.organization_id).first()
+  
+  if not org:
+    raise HTTPException(status_code=404, detail="Organization not found")
+      
+  return org
 
 # --- Admin Endpoint ---
 @app.get("/admin/stats", response_model=AdminDashboardStats)
-def get_admin_stats(db: Session = Depends(get_db), current_user: models.User = Depends(require_admin)):
+def get_admin_stats(
+  db: Session = Depends(get_db), 
+  current_user: models.User = Depends(require_admin), 
+  current_org_id: UUID = Depends(get_current_org_id)
+):
   # 1. High Level Stats
-  total_users = db.query(models.User).filter(models.User.role != "BOT").count()
-  total_incidents = db.query(models.Incident).count()
-  active_incidents = db.query(models.Incident).filter(models.Incident.status != models.IncidentStatus.CLOSED).count()
+  total_users = db.query(models.User).filter(models.User.role != "BOT", models.User.organization_id == current_org_id).count()
+  total_incidents = db.query(models.Incident).filter(models.Incident.organization_id == current_org_id).count()
+  active_incidents = db.query(models.Incident).filter(models.Incident.status != models.IncidentStatus.CLOSED, models.Incident.organization_id == current_org_id).count()
   
   # 2. Incidents by Severity
   sev_counts = db.query(models.Incident.severity, func.count(models.Incident.id)
-  ).group_by(models.Incident.severity).all()
+  ).filter(models.Incident.organization_id == current_org_id)\
+  .group_by(models.Incident.severity).all()
   
   # Convert [('SEV1', 5), ('SEV2', 2)] -> {'SEV1': 5, 'SEV2': 2}
   sev_dict = {sev: count for sev, count in sev_counts}
@@ -134,7 +162,7 @@ def get_admin_stats(db: Session = Depends(get_db), current_user: models.User = D
   user_data = db.query(
     models.User,
     func.count(models.Incident.id).label("incident_count")
-  ).filter(models.User.role != "BOT")\
+  ).filter(models.User.role != "BOT", models.User.organization_id == current_org_id)\
   .outerjoin(models.Incident, models.User.id == models.Incident.owner_id)\
     .group_by(models.User.id)\
     .all()
@@ -163,7 +191,11 @@ def get_admin_stats(db: Session = Depends(get_db), current_user: models.User = D
   )
   
 @app.get("/admin/analytics")
-def get_analytics(db: Session = Depends(get_db), current_user: models.User = Depends(require_admin)):
+def get_analytics(
+  db: Session = Depends(get_db), 
+  current_user: models.User = Depends(require_admin),
+  current_org_id: UUID = Depends(get_current_org_id)
+):
   # 1. MTTR Calculation (Mean Time to Resolve in hours)
   mttr_query = text("""
     SELECT AVG(EXTRACT(EPOCH FROM (resolved_at - created_at))) 
@@ -180,7 +212,7 @@ def get_analytics(db: Session = Depends(get_db), current_user: models.User = Dep
   daily_counts = db.query(
     func.date(models.Incident.created_at).label('date'),
     func.count(models.Incident.id)
-  ).filter(models.Incident.created_at >= seven_days_ago)\
+  ).filter(models.Incident.created_at >= seven_days_ago, models.Incident.organization_id == current_org_id)\
     .group_by('date')\
     .order_by('date')\
     .all()
@@ -199,10 +231,11 @@ def update_user_role(
   user_id: UUID,
   request: RoleUpdate,
   db: Session = Depends(get_db),
-  current_user: models.User = Depends(require_admin)
+  current_user: models.User = Depends(require_admin),
+  current_org_id: UUID = Depends(get_current_org_id)
 ):
   # 1. Fetch User
-  user = db.query(models.User).filter(models.User.id == user_id).first()
+  user = db.query(models.User).filter(models.User.id == user_id, models.User.organization_id == current_org_id).first()
   if not user:
     raise HTTPException(status_code=404, detail="User not found")
 
@@ -220,14 +253,15 @@ def update_user_role(
 def delete_user(
   user_id: UUID, 
   db: Session = Depends(get_db),
-  current_user: models.User = Depends(require_admin)
+  current_user: models.User = Depends(require_admin),
+  current_org_id: UUID = Depends(get_current_org_id)
 ):
   # 1. Prevent admin from deleting themselves
   if user_id == current_user.id:
     raise HTTPException(status_code=400, detail="Admins cannot delete their own account")
   
   # 2. Fetch User
-  user_to_delete = db.query(models.User).filter(models.User.id == user_id).first()
+  user_to_delete = db.query(models.User).filter(models.User.id == user_id, models.User.organization_id == current_org_id).first()
   if not user_to_delete:
     raise HTTPException(status_code=404, detail="User not found")
   
@@ -252,7 +286,8 @@ def delete_user(
 def create_incident(
   incident: IncidentCreate, 
   db: Session = Depends(get_db), 
-  current_user: models.User = Depends(get_current_user)
+  current_user: models.User = Depends(get_current_user),
+  current_org_id: UUID = Depends(get_current_org_id)
 ):
   try:
     # RBAC Logic for Assignment
@@ -271,7 +306,8 @@ def create_incident(
       description=incident.description,
       severity=incident.severity.value,
       owner_id=final_owner_id,
-      status=models.IncidentStatus.DETECTED
+      status=models.IncidentStatus.DETECTED,
+      organization_id=current_org_id
     )
     
     db.add(new_incident)
@@ -293,7 +329,7 @@ def create_incident(
     
     # 3. Send Async Email Notification to Owner
     send_incident_alert_email.delay(
-      to_email="mohd.taha75@gmail.com",
+      to_email=db.query(models.User).filter(models.User.id == final_owner_id, models.User.organization_id == current_org_id).first().email,
       incident_title=new_incident.title,
       incident_id=str(new_incident.id),
       severity=str(new_incident.severity)
@@ -314,10 +350,11 @@ def transition_incident(
   incident_id: UUID, 
   request: TransitionRequest, 
   db: Session = Depends(get_db), 
-  current_user: models.User = Depends(get_current_user)
+  current_user: models.User = Depends(get_current_user),
+  current_org_id: UUID = Depends(get_current_org_id)
 ):
   # 1. Fetch Incident
-  incident = db.query(models.Incident).filter(models.Incident.id == incident_id).first()
+  incident = db.query(models.Incident).filter(models.Incident.id == incident_id, models.Incident.organization_id == current_org_id).first()
   if not incident:
     raise HTTPException(status_code=404, detail="Incident not found")
 
@@ -370,10 +407,11 @@ def comment_on_incident(
   incident_id: UUID, 
   request: CommentRequest, 
   db: Session = Depends(get_db), 
-  current_user: models.User = Depends(get_current_user)
+  current_user: models.User = Depends(get_current_user),
+  current_org_id: UUID = Depends(get_current_org_id)
 ): 
   # 1. Fetch Incident
-  incident = db.query(models.Incident).filter(models.Incident.id == incident_id).first()
+  incident = db.query(models.Incident).filter(models.Incident.id == incident_id, models.Incident.organization_id == current_org_id).first()
   if not incident:
     raise HTTPException(status_code=404, detail="Incident not found")
   
@@ -397,25 +435,25 @@ def comment_on_incident(
 
 # Get list of incidents for dashboard
 @app.get("/incidents", response_model=List[IncidentRead])
-def get_incidents(db: Session = Depends(get_db)):
+def get_incidents(db: Session = Depends(get_db), current_org_id: UUID = Depends(get_current_org_id)):
   # Simple fetch for the dashboard
-  return db.query(models.Incident).all()
+  return db.query(models.Incident).filter(models.Incident.organization_id == current_org_id).all()
 
 # Get audit logs for an incident
 @app.get("/incidents/{incident_id}/events")
-def get_incident_events(incident_id: UUID, db: Session = Depends(get_db)):
+def get_incident_events(incident_id: UUID, db: Session = Depends(get_db), current_org_id: UUID = Depends(get_current_org_id)):
   # Fetch audit logs for an incident
   return db.query(models.IncidentEvent)\
-    .filter(models.IncidentEvent.incident_id == incident_id)\
+    .filter(models.IncidentEvent.incident_id == incident_id, models.IncidentEvent.organization_id == current_org_id)\
     .order_by(models.IncidentEvent.created_at.desc())\
     .all()
   
   
 # Get list of users
 @app.get("/users", response_model=List[UserRead])
-def get_users(db: Session = Depends(get_db)):
+def get_users(db: Session = Depends(get_db), current_org_id: UUID = Depends(get_current_org_id)):
   try:
-    users = db.query(models.User).all()
+    users = db.query(models.User).filter(models.User.organization_id == current_org_id, models.User.role != "BOT").all()
     return users
   except Exception as e:
     raise HTTPException(status_code=500, detail=str(e))
@@ -426,10 +464,11 @@ def update_incident(
   incident_id: str, 
   request: IncidentUpdate, 
   db: Session = Depends(get_db), 
-  current_user: models.User = Depends(require_manager)
+  current_user: models.User = Depends(require_manager),
+  current_org_id: UUID = Depends(get_current_org_id)
 ):
   
-  incident = db.query(models.Incident).filter(models.Incident.id == incident_id).first()
+  incident = db.query(models.Incident).filter(models.Incident.id == incident_id, models.Incident.organization_id == current_org_id).first()
   if not incident:
     raise HTTPException(status_code=404, detail="Incident not found")
   
@@ -484,10 +523,11 @@ def update_incident(
 def delete_incident(
   incident_id: UUID, 
   db: Session = Depends(get_db), 
-  current_user: models.User = Depends(require_admin)
+  current_user: models.User = Depends(require_admin),
+  current_org_id: UUID = Depends(get_current_org_id)
 ):
   
-  incident = db.query(models.Incident).filter(models.Incident.id == incident_id).first()
+  incident = db.query(models.Incident).filter(models.Incident.id == incident_id, models.Incident.organization_id == current_org_id).first()
   if not incident:
     raise HTTPException(status_code=404, detail="Incident not found")
   
@@ -507,8 +547,19 @@ def delete_incident(
 def sign_attachment_upload(
   incident_id: UUID,
   request: AttachmentSignRequest,
-  current_user: models.User = Depends(get_current_user)
+  db: Session = Depends(get_db),
+  current_user: models.User = Depends(get_current_user),
+  current_org_id: UUID = Depends(get_current_org_id)
 ):
+  
+  # Ensure incident belongs to user's org
+  incident = db.query(models.Incident).filter(
+    models.Incident.id == incident_id, 
+    models.Incident.organization_id == current_org_id
+  ).first()
+  
+  if not incident:
+    raise HTTPException(status_code=404, detail="Incident not found")
   
   # Create a unique object path key: incidents/{id}/{timestamp}_{filename}
   clean_filename = request.file_name.replace(" ", "_")
@@ -529,9 +580,10 @@ def add_attachment(
   incident_id: UUID,
   request: AttachmentCompleteRequest,
   db: Session = Depends(get_db),
-  current_user: models.User = Depends(get_current_user)
+  current_user: models.User = Depends(get_current_user),
+  current_org_id: UUID = Depends(get_current_org_id)
 ):
-  incident = db.query(models.Incident).filter(models.Incident.id == incident_id).first()
+  incident = db.query(models.Incident).filter(models.Incident.id == incident_id, models.Incident.organization_id == current_org_id).first()
   if not incident:
     raise HTTPException(status_code=404, detail="Incident not found")
   
@@ -562,8 +614,18 @@ def add_attachment(
 @app.get("/incidents/{incident_id}/attachments", response_model=List[AttachmentRead])
 def get_attachments(
   incident_id: UUID,
-  db: Session = Depends(get_db)
+  db: Session = Depends(get_db),
+  current_org_id: UUID = Depends(get_current_org_id)
 ):
+  # Ensure incident belongs to user's org
+  incident = db.query(models.Incident).filter(
+    models.Incident.id == incident_id, 
+    models.Incident.organization_id == current_org_id
+  ).first()
+  
+  if not incident:
+    raise HTTPException(status_code=404, detail="Incident not found")
+  
   attachments = db.query(models.IncidentAttachment)\
     .filter(models.IncidentAttachment.incident_id == incident_id)\
     .all()
@@ -590,11 +652,13 @@ def delete_attachment(
   incident_id: UUID,
   attachment_id: UUID,
   db: Session = Depends(get_db),
-  current_user: models.User = Depends(get_current_user)
+  current_user: models.User = Depends(get_current_user),
+  current_org_id: UUID = Depends(get_current_org_id)
 ):
   attachment = db.query(models.IncidentAttachment).filter(
     models.IncidentAttachment.id == attachment_id,
-    models.IncidentAttachment.incident_id == incident_id
+    models.IncidentAttachment.incident_id == incident_id,
+    models.IncidentAttachment.organization_id == current_org_id
   ).first()
   
   if not attachment:
