@@ -1,11 +1,14 @@
+# backend/app/core/tasks.py
+
 import os
 import smtplib
 from email.message import EmailMessage
 import uuid
-from celery_app import celery
 from datetime import datetime, timedelta
-import models
-from database import SessionLocal
+
+from app.core.celery_app import celery
+from app.db.session import SessionLocal
+import app.models as models
 
 SMTP_HOST = os.getenv("SMTP_HOST", "localhost")
 SMTP_PORT = int(os.getenv("SMTP_PORT", 1025))

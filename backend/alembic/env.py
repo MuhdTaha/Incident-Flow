@@ -14,7 +14,7 @@ sys.path.append(os.getcwd())
 
 # 2. Import your Base and config
 from database import Base  # Where your declarative_base is
-import models              # Import models so Base finds them
+import backend.temp.models as models              # Import models so Base finds them
 from dotenv import load_dotenv
 
 load_dotenv() # Load .env variables

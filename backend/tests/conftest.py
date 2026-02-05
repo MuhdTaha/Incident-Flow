@@ -9,6 +9,7 @@ from sqlalchemy.pool import StaticPool
 from fastapi.testclient import TestClient
 from main import app
 from database import get_db, Base
+from app.models import User, Organization
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

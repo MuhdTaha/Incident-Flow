@@ -1,14 +1,16 @@
-# backend/deps.py
+# backend/app/api/deps.py
+
 import os
 from typing import List
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 from sqlalchemy.orm import Session
-from database import get_db
 from uuid import UUID
-from app import models
 from dotenv import load_dotenv
+
+from app.db.session import get_db
+import app.models as models
 
 load_dotenv()
 
@@ -71,3 +73,7 @@ class RoleChecker:
         detail=f"Operation not permitted. Requires one of: {self.allowed_roles}"
       )
     return user
+  
+# --- Role Checkers ---
+require_admin = RoleChecker(["ADMIN"])
+require_manager = RoleChecker(["ADMIN", "MANAGER"])

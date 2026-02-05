@@ -3,19 +3,33 @@ import pytest
 import uuid
 from main import app
 from database import get_db
-from models import User, UserRole, IncidentStatus, Incident
+from app.models import User, UserRole, IncidentStatus, Incident, Organization
 from deps import get_current_user
 
 # --- Fixtures ---
 
 @pytest.fixture
-def engineer_user(db):
+def test_organization(db):
+  """Seeds a dummy organization to populate other tables."""
+  org = Organization(
+    id=uuid.uuid4(),
+    name="Test Org",
+    slug="test-org",
+  )
+  db.add(org)
+  db.commit()
+  db.refresh(org)
+  return org
+
+@pytest.fixture
+def engineer_user(db, test_organization):
   """Creates a standard ENGINEER user."""
   user = User(
     id=uuid.uuid4(),
     email="eng@testing.com", 
     full_name="Software Engineer",
-    role=UserRole.ENGINEER
+    role=UserRole.ENGINEER,
+    organization_id=test_organization.id
   )
   db.add(user)
   db.flush()
@@ -23,14 +37,15 @@ def engineer_user(db):
   return user
 
 @pytest.fixture
-def incident_id(db, engineer_user):
+def incident_id(db, engineer_user, test_organization):
   """Seeds a single incident to test against."""
   inc = Incident(
     title="Database Latency",
     description="High latency on primary DB",
     severity="SEV2",
     owner_id=engineer_user.id,
-    status=IncidentStatus.DETECTED
+    status=IncidentStatus.DETECTED,
+    organization_id=test_organization.id
   )
   db.add(inc)
   db.commit() # Commit so it exists for the client requests
@@ -48,7 +63,7 @@ def test_full_incident_lifecycle(client, db, engineer_user, incident_id):
   # 1. Test Transition (DETECTED -> INVESTIGATING)
   transition_payload = {
     "new_state": "INVESTIGATING",
-    "comment": "Starting investigation now."
+    "comment": "Starting investigation now.",
   }
   response = client.post(f"/incidents/{incident_id}/transition", json=transition_payload)
   assert response.status_code == 200
@@ -97,20 +112,29 @@ def test_full_incident_lifecycle(client, db, engineer_user, incident_id):
   del app.dependency_overrides[get_current_user]
 
 
-def test_rbac_assignment_restriction(client, db, engineer_user):
+def test_rbac_assignment_restriction(client, db, engineer_user, test_organization):
   """
   Engineers cannot assign incidents to OTHERS.
   """
   app.dependency_overrides[get_current_user] = lambda: engineer_user
   
   # Create another random user ID
-  other_user_id = str(uuid.uuid4())
+  other_user = User(
+    id=uuid.uuid4(),
+    email="other@testing.com",
+    full_name="Other Guy",
+    role=UserRole.ENGINEER,
+    organization_id=test_organization.id
+  )
+  
+  db.add(other_user)
+  db.commit()
   
   payload = {
     "title": "Restricted Incident",
     "description": "Trying to assign to someone else",
     "severity": "SEV3",
-    "owner_id": other_user_id # <--- This should be forbidden for Engineers
+    "owner_id": str(other_user.id) # <--- This should be forbidden for Engineers
   }
   
   response = client.post("/incidents", json=payload)
@@ -130,4 +154,42 @@ def test_incident_not_found(client, engineer_user):
   
   assert response.status_code == 404
   
+  del app.dependency_overrides[get_current_user]
+  
+def test_tenant_isolation(client, db, incident_id):
+  """
+  CRITICAL: A user from Org B should NOT be able to see Org A's incident.
+  """
+  # 1. Create a Competitor Org
+  competitor_org = Organization(id=uuid.uuid4(), name="Competitor Corp", slug="comp-corp")
+  db.add(competitor_org)
+  
+  # 2. Create a User in Competitor Org
+  competitor_user = User(
+    id=uuid.uuid4(),
+    email="spy@competitor.com",
+    full_name="Corporate Spy",
+    role=UserRole.ADMIN, # Even an Admin shouldn't see other org's data
+    organization_id=competitor_org.id
+  )
+  db.add(competitor_user)
+  db.commit()
+
+  # 3. Login as Competitor
+  app.dependency_overrides[get_current_user] = lambda: competitor_user
+
+  # 4. Try to access the original incident (belonging to Test Org)
+  response = client.get(f"/incidents/{incident_id}/events")
+  
+  # Should return 404 (Not Found) or 403 (Forbidden)
+  # 404 is usually safer (don't reveal the ID exists)
+  assert response.status_code in [403, 404] 
+  
+  # 5. Try to list incidents - should return empty list or only their own
+  response = client.get("/incidents")
+  incidents = response.json()
+  
+  # Ensure the original incident ID is NOT in the list
+  assert not any(i["id"] == incident_id for i in incidents)
+
   del app.dependency_overrides[get_current_user]

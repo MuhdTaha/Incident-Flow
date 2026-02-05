@@ -18,7 +18,7 @@ import {
   Paperclip
 } from "lucide-react";
 
-// Import the new component
+import { authFetch } from "@/lib/api";
 import AttachmentManager from "./AttachmentManager";
 
 type Event = {
@@ -46,15 +46,30 @@ export default function IncidentHistory({ incidentId, incidentTitle, incidentDes
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (incidentId && isOpen) {
+    if (!incidentId || !isOpen) return;
+
+    let isMounted = true;
+
+    const fetchEvents = async () => {
       setLoading(true);
-      // Ideally use authFetch here to be safe, but fetch works for now
-      fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/incidents/${incidentId}/events`)
-        .then(res => res.json())
-        .then(data => setEvents(data))
-        .catch(err => console.error(err))
-        .finally(() => setLoading(false));
-    }
+      try {
+        const res = await authFetch(`/incidents/${incidentId}/events`);
+        const data = await res.json();
+        
+        if (isMounted) {
+          setEvents(Array.isArray(data) ? data : []);
+        }
+      } catch (err) {
+        console.error(err);
+        if (isMounted) setEvents([]);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    fetchEvents();
+
+    return () => { isMounted = false; }; // Cleanup function
   }, [incidentId, isOpen]);
 
   const formatDate = (dateString: string) => {

@@ -8,6 +8,6 @@ def test_create_incident_requires_auth(client):
   # Try to create without a token -> Should fail
   response = client.post(
     "/incidents",
-    json={"title": "Test", "description": "Test", "severity": "SEV4"},
+    json={"title": "Test", "description": "Test", "severity": "SEV4", "organization_id": "00000000000000000000000000000111"},
   )
   assert response.status_code == 401 # Unauthorized access

@@ -1,4 +1,5 @@
-# backend/storage.py
+# backend/app/core/storage.py
+
 import os
 import boto3
 import json

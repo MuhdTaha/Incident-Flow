@@ -1,4 +1,5 @@
-# backend/models.py
+# backend/app/models.py
+
 from datetime import datetime
 from os import name
 import uuid
@@ -53,7 +54,7 @@ class User(Base):
   role = Column(SQLEnum(UserRole, name="user_role"), default=UserRole.ENGINEER, nullable=False)
   created_at = Column(DateTime(timezone=True), server_default=func.now())
   phone_number = Column(String, nullable=True)
-  organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"))
+  organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False)
 
   # Relationships
   incidents = relationship("Incident", back_populates="owner")
@@ -72,7 +73,7 @@ class Incident(Base):
   created_at = Column(DateTime(timezone=True), server_default=func.now())
   updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
   resolved_at = Column(DateTime(timezone=True), nullable=True)
-  organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"))
+  organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False)
 
   # Relationships
   owner = relationship("User", back_populates="incidents")
@@ -96,7 +97,7 @@ class IncidentEvent(Base):
   new_value = Column(String)
   comment = Column(Text)
   created_at = Column(DateTime(timezone=True), server_default=func.now())
-  organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"))
+  organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False)
 
   # Relationships
   incident = relationship("Incident", back_populates="events")
@@ -111,7 +112,8 @@ class IncidentAttachment(Base):
   file_key = Column(String, unique=True, nullable=False) # S3/MinIO object path
   uploaded_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
   created_at = Column(DateTime(timezone=True), server_default=func.now())
-  organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"))
+  organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False)
   
   # Relationships
   incident = relationship("Incident", back_populates="attachments")
+  uploader = relationship("User")  # To get uploader details

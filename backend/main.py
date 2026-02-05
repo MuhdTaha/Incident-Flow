@@ -1,20 +1,29 @@
 # backend/main.py
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func, text
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, computed_field, Field
 from typing import Optional, List
-from database import get_db, engine
 from uuid import UUID
-from tasks import send_incident_alert_email
-import models
 import os
 import time
-from datetime import datetime, timedelta
-from fsm import can_transition, IncidentStatus, VALID_TRANSITIONS
-from deps import get_current_org_id, get_current_user, RoleChecker
 from storage import create_presigned_post, BUCKET_NAME, S3_EXTERNAL_ENDPOINT, get_s3_client
+
+# Refactored Schemas
+from app.schemas.incident import IncidentCreate, IncidentRead, TransitionRequest, CommentRequest, IncidentUpdate
+from app.schemas.user import UserRead, RoleUpdate
+from app.schemas.attachment import AttachmentSignRequest, AttachmentCompleteRequest, AttachmentRead
+from app.schemas.analytics import UserStats, AdminDashboardStats, VolumeTrendPoint, AnalyticsResponse
+from app.schemas.common import OrgProfile
+
+import app.models as models
+from app.api.deps import get_current_user, get_current_org_id, require_admin, require_manager
+from app.services.incident_service import IncidentService
+from app.services.user_service import UserService
+from app.services.analytics_service import AnalyticsService
+from app.services.attachment_service import AttachmentService
+from app.repositories.incident_repo import IncidentRepository
+from app.db.session import get_db
 
 # No need to create tables here as Alembic handles migrations
 # if os.getenv("TESTING") != "True":
@@ -29,655 +38,318 @@ app.add_middleware(
   allow_headers=["*"],
 )
 
-# --- Schemas ---
-class TransitionRequest(BaseModel):
-  new_state: IncidentStatus
-  comment: Optional[str] = None
-  
-class CommentRequest(BaseModel):
-  comment: str
-  
-class IncidentCreate(BaseModel):
-  title: str
-  description: str
-  severity: models.IncidentSeverity
-  owner_id: Optional[UUID] = None
+router = APIRouter()
 
-class UserRead(BaseModel):
-  id: UUID
-  full_name: str
-  role: str
-  
-  class Config:
-    from_attributes = True
+# --- Dependency Helper ---
 
-class IncidentRead(BaseModel):
-  id: UUID
-  title: str
-  description: str
-  severity: str
-  status: str
-  owner_id: UUID
-  updated_at: datetime
-  
-  @computed_field
-  @property
-  def allowed_transitions(self) -> List[str]:
-    return VALID_TRANSITIONS.get(IncidentStatus(self.status), [])
-  
-  class Config:
-    from_attributes = True
-    
-class IncidentUpdate(BaseModel):
-  severity: Optional[str] = None
-  owner_id: Optional[str] = None
-  comment: Optional[str] = None
+def get_incident_service(db: Session = Depends(get_db)) -> IncidentService:
+  return IncidentService(db)
 
-require_admin = RoleChecker(["ADMIN"])
-require_manager = RoleChecker(["ADMIN", "MANAGER"])
+def get_user_service(db: Session = Depends(get_db)) -> UserService:
+  return UserService(db)
 
-# --- Attachment Upload Schemas ---
-class AttachmentSignRequest(BaseModel):
-  file_name: str
-  file_type: str
+def get_analytics_service(db: Session = Depends(get_db)) -> AnalyticsService:
+  return AnalyticsService(db)
 
-class AttachmentCompleteRequest(BaseModel):
-  file_name: str
-  file_key: str
+def get_attachment_service(db: Session = Depends(get_db)) -> AttachmentService:
+  return AttachmentService(db)
 
-class AttachmentRead(BaseModel):
-  id: UUID
-  file_name: str
-  file_url: str
-  uploaded_by: str
-  created_at: datetime
+
+# --- Incident Endpoints ---
+
+@app.get("/incidents", response_model=List[IncidentRead])
+def get_incidents(db: Session = Depends(get_db), current_org_id: UUID = Depends(get_current_org_id)):
+  """
+  List all incidents for the current organization.
+  Direct Repo access is fine for simple reads (Skip Service overhead)
+  """
+  repo = IncidentRepository(db)
+  if not repo:
+    raise HTTPException(status_code=500, detail="Incident repository not available")
   
-  class Config:
-    from_attributes = True
+  return repo.get_all(org_id=current_org_id) 
 
-# --- Admin Schemas ---
-class UserStats(BaseModel):
-  id: UUID
-  full_name: str
-  email: str
-  role: str
-  created_at: datetime
-  incident_count: int # How many incidents they own
-  
-class AdminDashboardStats(BaseModel):
-  total_users: int
-  total_incidents: int
-  active_incidents: int # Status != CLOSED
-  incidents_by_severity: dict # {"SEV1": 5, "SEV2": 2...}
-  users: List[UserStats]
-  
-class RoleUpdate(BaseModel):
-  role: str # "ADMIN", "MANAGER", "ENGINEER"
-
-# --- Organization Profile ---
-class OrgProfile(BaseModel):
-  id: UUID
-  name: str
-  slug: str
-  
-  class Config:
-    from_attributes = True
-    
-@app.get("/organization", response_model=OrgProfile)
-def get_org_profile(
-  db: Session = Depends(get_db),
+@app.post("/incidents", response_model=dict)
+def create_incident(
+  incident: IncidentCreate, 
+  service: IncidentService = Depends(get_incident_service),
   current_user: models.User = Depends(get_current_user),
-):
-  if not current_user.organization_id:
-    raise HTTPException(status_code=404, detail="User is not part of an organization")
-
-  org = db.query(models.Organization).filter(models.Organization.id == current_user.organization_id).first()
-  
-  if not org:
-    raise HTTPException(status_code=404, detail="Organization not found")
-      
-  return org
-
-# --- Admin Endpoint ---
-@app.get("/admin/stats", response_model=AdminDashboardStats)
-def get_admin_stats(
-  db: Session = Depends(get_db), 
-  current_user: models.User = Depends(require_admin), 
   current_org_id: UUID = Depends(get_current_org_id)
 ):
-  # 1. High Level Stats
-  total_users = db.query(models.User).filter(models.User.role != "BOT", models.User.organization_id == current_org_id).count()
-  total_incidents = db.query(models.Incident).filter(models.Incident.organization_id == current_org_id).count()
-  active_incidents = db.query(models.Incident).filter(models.Incident.status != models.IncidentStatus.CLOSED, models.Incident.organization_id == current_org_id).count()
+  """
+  Create a new incident. 
+  RBAC logic for assigning to others is handled inside the Service.
+  """
   
-  # 2. Incidents by Severity
-  sev_counts = db.query(models.Incident.severity, func.count(models.Incident.id)
-  ).filter(models.Incident.organization_id == current_org_id)\
-  .group_by(models.Incident.severity).all()
+  new_incident = service.create_incident(incident, current_user, current_org_id)
+  if not new_incident:
+    raise HTTPException(status_code=500, detail="Failed to create incident")
   
-  # Convert [('SEV1', 5), ('SEV2', 2)] -> {'SEV1': 5, 'SEV2': 2}
-  sev_dict = {sev: count for sev, count in sev_counts}
+  return {"id": str(new_incident.id), "message": "Incident created successfully"}
+
+@app.post("/incidents/{incident_id}/transition")
+def transition_incident(
+  incident_id: UUID,
+  request: TransitionRequest,
+  service: IncidentService = Depends(get_incident_service),
+  current_user: models.User = Depends(get_current_user),
+  current_org_id: UUID = Depends(get_current_org_id)
+):
+  """
+  Transition an incident to a new state with RBAC and Audit Logging.
+  """
   
-  # 3. User Stats with Incident Counts (Outer Join so users with 0 incidents are included)
-  user_data = db.query(
-    models.User,
-    func.count(models.Incident.id).label("incident_count")
-  ).filter(models.User.role != "BOT", models.User.organization_id == current_org_id)\
-  .outerjoin(models.Incident, models.User.id == models.Incident.owner_id)\
-    .group_by(models.User.id)\
-    .all()
-    
-  # Format the user stats
-  users_formatted = []
+  try:
+    service.transition_incident(incident_id, request, current_user, current_org_id)
+  except HTTPException as he:
+    raise he
+  except Exception as e:
+    raise HTTPException(status_code=500, detail=str(e))
   
-  for user, incident_count in user_data:
-    users_formatted.append(
-      UserStats(
-        id=user.id,
-        full_name=user.full_name,
-        email=user.email,
-        role=user.role,
-        created_at=user.created_at,
-        incident_count=incident_count
-      )
-    )
+  return {"id": str(incident_id), "message": f"Incident transitioned to {request.new_state} successfully"}
   
-  return AdminDashboardStats(
-    total_users=total_users,
-    total_incidents=total_incidents,
-    active_incidents=active_incidents,
-    incidents_by_severity=sev_dict,
-    users=users_formatted
-  )
+@app.patch("/incidents/{incident_id}")
+def update_incident(
+  incident_id: UUID,
+  request: IncidentUpdate,
+  service: IncidentService = Depends(get_incident_service),
+  current_user: models.User = Depends(require_manager),
+  current_org_id: UUID = Depends(get_current_org_id)
+):
+  """
+  Update incident details (severity, owner) with audit logging.
+  """
+
+  try:
+    service.update_incident(incident_id, request, current_user, current_org_id)
+  except HTTPException as he:
+    raise he
+  except Exception as e:
+    raise HTTPException(status_code=500, detail=str(e))
   
-@app.get("/admin/analytics")
-def get_analytics(
-  db: Session = Depends(get_db), 
+  return {"id": str(incident_id), "message": "Incident updated successfully"}
+
+@app.post("/incidents/{incident_id}/comment")
+def comment_on_incident(
+  incident_id: UUID, 
+  request: CommentRequest,
+  service: IncidentService = Depends(get_incident_service),
+  current_user: models.User = Depends(get_current_user),
+  current_org_id: UUID = Depends(get_current_org_id)
+): 
+  """
+  Add a comment to an incident with audit logging.
+  """
+  
+  try:
+    service.add_comment(incident_id, request, current_user, current_org_id)
+  except HTTPException as he:
+    raise he
+  except Exception as e:
+    raise HTTPException(status_code=500, detail=str(e))
+  
+  return {"id": str(incident_id), "message": "Comment added successfully"}
+  
+@app.delete("/incidents/{incident_id}")
+def delete_incident(
+  incident_id: UUID, 
+  service: IncidentService = Depends(get_incident_service),
   current_user: models.User = Depends(require_admin),
   current_org_id: UUID = Depends(get_current_org_id)
 ):
-  # 1. MTTR Calculation (Mean Time to Resolve in hours)
-  mttr_query = text("""
-    SELECT AVG(EXTRACT(EPOCH FROM (resolved_at - created_at))) 
-    FROM incidents 
-    WHERE resolved_at IS NOT NULL
-  """)
+  """
+  Delete an incident. Only Admins can delete incidents.
+  """
   
-  avg_seconds = db.execute(mttr_query).scalar() or 0
-  avg_hours = round(avg_seconds / 3600, 1)
+  try:
+    service.delete_incident(incident_id, current_user, current_org_id)
+  except HTTPException as he:
+    raise he
+  except Exception as e:
+    raise HTTPException(status_code=500, detail=str(e))
   
-  # 2. Incidents Volume (Last 7 days)
-  # Groups incidents by date to populate the Line Chart
-  seven_days_ago = datetime.utcnow() - timedelta(days=7)
-  daily_counts = db.query(
-    func.date(models.Incident.created_at).label('date'),
-    func.count(models.Incident.id)
-  ).filter(models.Incident.created_at >= seven_days_ago, models.Incident.organization_id == current_org_id)\
-    .group_by('date')\
-    .order_by('date')\
-    .all()
-    
-  # Format for Frontend [{"date": "2023-10-01", "count": 5}, ...]
-  volume_trend = [{"date": str(day), "count": count} for day, count in daily_counts]
-  
-  return {
-    "mttr_hours": avg_hours,
-    "volume_trend": volume_trend
-  }
+  return {"id": str(incident_id), "message": "Incident deleted successfully"}
 
+@app.get("/incidents/{incident_id}/events")
+def get_incident_events(
+  incident_id: UUID, 
+  service: IncidentService = Depends(get_incident_service),
+  current_org_id: UUID = Depends(get_current_org_id)
+):
+  """
+  Retrieve audit logs for a specific incident.
+  """
+
+  try:
+    return service.get_incident_events(incident_id, current_org_id)
+  except HTTPException as he:
+    raise he
+  except Exception as e:
+    raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- User Endpoints ---
+
+@app.get("/users", response_model=List[UserRead])
+def get_users(
+  service: UserService = Depends(get_user_service),
+  current_org_id: UUID = Depends(get_current_org_id)
+):
+  """
+  Return a list of users in the organization.
+  """
+  
+  try:
+    return service.list_users(org_id=current_org_id)
+  except Exception as e:
+    raise HTTPException(status_code=500, detail="Failed to fetch users")
 
 @app.patch("/users/{user_id}/role")
 def update_user_role(
   user_id: UUID,
   request: RoleUpdate,
-  db: Session = Depends(get_db),
-  current_user: models.User = Depends(require_admin),
+  service: UserService = Depends(get_user_service),
+  current_user: models.User = Depends(get_current_user),
   current_org_id: UUID = Depends(get_current_org_id)
 ):
-  # 1. Fetch User
-  user = db.query(models.User).filter(models.User.id == user_id, models.User.organization_id == current_org_id).first()
-  if not user:
-    raise HTTPException(status_code=404, detail="User not found")
-
-  # 2. Check if admin is trying to change their own role
-  if user.id == current_user.id:
-    raise HTTPException(status_code=400, detail="Admins cannot change their own role")
+  """
+  Update a user's role with business rule enforcement.
+  """
   
-  user.role = request.role
-  db.commit()
-  db.refresh(user)
+  try:
+    service.update_role(user_id, request, current_user.id, current_org_id)
+  except HTTPException as he:
+    raise he
+  except Exception as e:
+    raise HTTPException(status_code=500, detail=str(e))
   
-  return {"id": user.id, "role": user.role, "message": "Role updated successfully"}
+  return {"id": str(user_id), "message": "User role updated successfully"}
 
 @app.delete("/users/{user_id}")
 def delete_user(
   user_id: UUID, 
-  db: Session = Depends(get_db),
+  service: UserService = Depends(get_user_service),
   current_user: models.User = Depends(require_admin),
   current_org_id: UUID = Depends(get_current_org_id)
 ):
-  # 1. Prevent admin from deleting themselves
-  if user_id == current_user.id:
-    raise HTTPException(status_code=400, detail="Admins cannot delete their own account")
-  
-  # 2. Fetch User
-  user_to_delete = db.query(models.User).filter(models.User.id == user_id, models.User.organization_id == current_org_id).first()
-  if not user_to_delete:
-    raise HTTPException(status_code=404, detail="User not found")
+  """
+  Delete a user with business rule enforcement.
+  """
   
   try:
-    # 3. Reassign Incidents and Incident Events owned by this user to None
-    db.query(models.Incident).filter(models.Incident.owner_id == user_id).update({models.Incident.owner_id: None})
-    db.query(models.IncidentEvent).filter(models.IncidentEvent.actor_id == user_id).update({models.IncidentEvent.actor_id: None})
-    
-    # 4. Delete User
-    db.delete(user_to_delete)
-    db.commit()
-  except Exception as e:
-    db.rollback()
-    raise HTTPException(status_code=500, detail=str(e))
-  
-  return {"id": user_to_delete.id, "message": "User deleted successfully"}
-  
-# --- Endpoints ---
-
-# Create a new incident with initial audit log
-@app.post("/incidents", response_model=dict)
-def create_incident(
-  incident: IncidentCreate, 
-  db: Session = Depends(get_db), 
-  current_user: models.User = Depends(get_current_user),
-  current_org_id: UUID = Depends(get_current_org_id)
-):
-  try:
-    # RBAC Logic for Assignment
-    final_owner_id = current_user.id
-    
-    if incident.owner_id:
-      if incident.owner_id != current_user.id:
-        if current_user.role not in ["ADMIN", "MANAGER"]:
-          raise HTTPException(status_code=403, detail="Not authorized to assign incidents to others")
-        
-        final_owner_id = incident.owner_id
-    
-    # 1. Create the Incident Record
-    new_incident = models.Incident(
-      title=incident.title,
-      description=incident.description,
-      severity=incident.severity.value,
-      owner_id=final_owner_id,
-      status=models.IncidentStatus.DETECTED,
-      organization_id=current_org_id
-    )
-    
-    db.add(new_incident)
-    db.flush()  # To get the ID
-    
-    # 2. Create Initial Audit Log
-    audit_log = models.IncidentEvent(
-      incident_id=new_incident.id,
-      actor_id=current_user.id,
-      event_type="CREATION",
-      old_value=None,
-      new_value=models.IncidentStatus.DETECTED,
-      comment=f"Incident declared by {current_user.full_name}" + 
-            (f" (Assigned to {final_owner_id})" if final_owner_id != current_user.id else "")
-    )
-    
-    db.add(audit_log)
-    db.commit()
-    
-    # 3. Send Async Email Notification to Owner
-    send_incident_alert_email.delay(
-      to_email=db.query(models.User).filter(models.User.id == final_owner_id, models.User.organization_id == current_org_id).first().email,
-      incident_title=new_incident.title,
-      incident_id=str(new_incident.id),
-      severity=str(new_incident.severity)
-    )
-    
-    return {"id": str(new_incident.id), "message": "Incident created successfully"}
-  
+    service.delete_user(user_id, current_user.id, current_org_id)
   except HTTPException as he:
     raise he
   except Exception as e:
-    db.rollback()
     raise HTTPException(status_code=500, detail=str(e))
+  
+  return {"id": str(user_id), "message": "User deleted successfully"}
+
+    
+# --- Organization Endpoint ---
+
+@app.get("/organization", response_model=OrgProfile)
+def get_org_profile(
+  service: UserService = Depends(get_user_service),
+  current_org_id: UUID = Depends(get_current_org_id) 
+):
+  """
+  Retrieve organization profile details.
+  """
+  return service.get_org(current_org_id)
 
 
-# Transition Incident State with Audit Logging
-@app.post("/incidents/{incident_id}/transition")
-def transition_incident(
-  incident_id: UUID, 
-  request: TransitionRequest, 
-  db: Session = Depends(get_db), 
-  current_user: models.User = Depends(get_current_user),
+# --- Admin Endpoint ---
+
+@app.get("/admin/stats", response_model=AdminDashboardStats)
+def get_admin_stats(
+  service: AnalyticsService = Depends(get_analytics_service),
+  current_user: models.User = Depends(require_admin), 
   current_org_id: UUID = Depends(get_current_org_id)
 ):
-  # 1. Fetch Incident
-  incident = db.query(models.Incident).filter(models.Incident.id == incident_id, models.Incident.organization_id == current_org_id).first()
-  if not incident:
-    raise HTTPException(status_code=404, detail="Incident not found")
-
-  # 2. Validate Transition (FSM Logic)
-  if not can_transition(incident.status, request.new_state):
-    raise HTTPException(
-      status_code=400,
-      detail=f"Invalid transition: Cannot move from {incident.status} to {request.new_state}"
-    )
-
-  # 3. Atomic Transaction
-  # We prepare both the update and the audit log before committing.
+  """
+  Retrieve aggregated statistics for the admin dashboard.
+  """
   try:
-    old_state = incident.status
-    
-    # Handle Resultion Timestamp
-    if request.new_state in [IncidentStatus.RESOLVED, IncidentStatus.CLOSED]:
-      if not incident.resolved_at:
-        incident.resolved_at = datetime.utcnow()
-    
-    # A. Update the Source of Truth
-    incident.status = request.new_state
-    
-    # B. Insert Immutable Audit Log
-    audit_log = models.IncidentEvent(
-      incident_id=incident.id,
-      actor_id=current_user.id,
-      event_type="STATUS_CHANGE",
-      old_value=old_state,
-      new_value=request.new_state,
-      comment=request.comment or f"State changed from {old_state} to {request.new_state}"
-    )
-    db.add(audit_log)
-    
-    # C. Commit both as a single unit of work
-    db.commit()
-    db.refresh(incident)
-      
-  except Exception as e:
-    # Rollback in case of error
-    db.rollback()
-    raise HTTPException(status_code=500, detail=str(e))
-
-  return {"id": incident.id, "status": incident.status, "message": "Transition successful"}
-
-
-# Post for comments on an incident
-@app.post("/incidents/{incident_id}/comment")
-def comment_on_incident(
-  incident_id: UUID, 
-  request: CommentRequest, 
-  db: Session = Depends(get_db), 
-  current_user: models.User = Depends(get_current_user),
-  current_org_id: UUID = Depends(get_current_org_id)
-): 
-  # 1. Fetch Incident
-  incident = db.query(models.Incident).filter(models.Incident.id == incident_id, models.Incident.organization_id == current_org_id).first()
-  if not incident:
-    raise HTTPException(status_code=404, detail="Incident not found")
-  
-  try:
-    # 2. Insert Immutable Audit Log for Comment
-    audit_log = models.IncidentEvent(
-      incident_id=incident.id,
-      actor_id=current_user.id,
-      event_type="COMMENT",
-      comment=request.comment
-    )
-    db.add(audit_log)
-    db.commit()
-    
-  except Exception as e:
-    db.rollback()
-    raise HTTPException(status_code=500, detail=str(e))
-  
-  return {"id": incident.id, "message": "Comment added successfully"}
-
-
-# Get list of incidents for dashboard
-@app.get("/incidents", response_model=List[IncidentRead])
-def get_incidents(db: Session = Depends(get_db), current_org_id: UUID = Depends(get_current_org_id)):
-  # Simple fetch for the dashboard
-  return db.query(models.Incident).filter(models.Incident.organization_id == current_org_id).all()
-
-# Get audit logs for an incident
-@app.get("/incidents/{incident_id}/events")
-def get_incident_events(incident_id: UUID, db: Session = Depends(get_db), current_org_id: UUID = Depends(get_current_org_id)):
-  # Fetch audit logs for an incident
-  return db.query(models.IncidentEvent)\
-    .filter(models.IncidentEvent.incident_id == incident_id, models.IncidentEvent.organization_id == current_org_id)\
-    .order_by(models.IncidentEvent.created_at.desc())\
-    .all()
-  
-  
-# Get list of users
-@app.get("/users", response_model=List[UserRead])
-def get_users(db: Session = Depends(get_db), current_org_id: UUID = Depends(get_current_org_id)):
-  try:
-    users = db.query(models.User).filter(models.User.organization_id == current_org_id, models.User.role != "BOT").all()
-    return users
+    return service.get_admin_dashboard_stats(current_org_id)
   except Exception as e:
     raise HTTPException(status_code=500, detail=str(e))
-  
-# Update incident details (severity, owner) with audit logging
-@app.patch("/incidents/{incident_id}")
-def update_incident(
-  incident_id: str, 
-  request: IncidentUpdate, 
-  db: Session = Depends(get_db), 
-  current_user: models.User = Depends(require_manager),
-  current_org_id: UUID = Depends(get_current_org_id)
-):
-  
-  incident = db.query(models.Incident).filter(models.Incident.id == incident_id, models.Incident.organization_id == current_org_id).first()
-  if not incident:
-    raise HTTPException(status_code=404, detail="Incident not found")
-  
-  try:
-    # Track changes for audit logging
-    changes = []
-    
-    # Update Severity if provided
-    if request.severity and request.severity != incident.severity:
-      old_sev = incident.severity
-      incident.severity = request.severity
-      changes.append((
-        "SEVERITY_CHANGE", 
-        old_sev, 
-        request.severity
-      ))
-    
-    # Update Owner if provided
-    if request.owner_id and str(request.owner_id) != str(incident.owner_id):
-      old_owner = str(incident.owner_id)
-      incident.owner_id = request.owner_id
-      changes.append((
-        "OWNER_CHANGE", 
-        old_owner, 
-        str(request.owner_id)
-      ))
-    
-    # Create audit logs for each change
-    for change in changes:
-      event_type, old_value, new_value = change
-      audit_log = models.IncidentEvent(
-        incident_id=incident.id,
-        actor_id=current_user.id,
-        event_type=event_type,
-        old_value=old_value,
-        new_value=new_value,
-        comment=request.comment or f"{event_type} from {old_value} to {new_value}"
-      )
-      db.add(audit_log)
-    
-    db.commit()
-    db.refresh(incident)
-    
-  except Exception as e:
-    db.rollback()
-    raise HTTPException(status_code=500, detail=str(e))
-  
-  return {"id": incident.id, "message": "Incident updated successfully"}
 
-# Delete an incident (Admin only)
-@app.delete("/incidents/{incident_id}")
-def delete_incident(
-  incident_id: UUID, 
-  db: Session = Depends(get_db), 
+  
+@app.get("/admin/analytics")
+def get_analytics(
+  service: AnalyticsService = Depends(get_analytics_service),
   current_user: models.User = Depends(require_admin),
   current_org_id: UUID = Depends(get_current_org_id)
 ):
-  
-  incident = db.query(models.Incident).filter(models.Incident.id == incident_id, models.Incident.organization_id == current_org_id).first()
-  if not incident:
-    raise HTTPException(status_code=404, detail="Incident not found")
-  
+  """
+  Retrieve analytics charts data for the admin dashboard.
+  """
   try:
-    db.delete(incident)
-    db.commit()
+    return service.get_analytics_charts(current_org_id)
   except Exception as e:
-    db.rollback()
     raise HTTPException(status_code=500, detail=str(e))
-  
-  return {"id": incident_id, "message": "Incident deleted successfully"}
 
-# --- Attachment Upload Endpoints ---
 
-# 1. Get Presigned URL (Step 1 of Upload)
-@app.post("/incidents/{incident_id}/attachments/sign", response_model=dict)
-def sign_attachment_upload(
-  incident_id: UUID,
-  request: AttachmentSignRequest,
-  db: Session = Depends(get_db),
-  current_user: models.User = Depends(get_current_user),
-  current_org_id: UUID = Depends(get_current_org_id)
-):
-  
-  # Ensure incident belongs to user's org
-  incident = db.query(models.Incident).filter(
-    models.Incident.id == incident_id, 
-    models.Incident.organization_id == current_org_id
-  ).first()
-  
-  if not incident:
-    raise HTTPException(status_code=404, detail="Incident not found")
-  
-  # Create a unique object path key: incidents/{id}/{timestamp}_{filename}
-  clean_filename = request.file_name.replace(" ", "_")
-  file_key = f"incidents/{incident_id}/{int(time.time())}_{clean_filename}"
-  
-  presigned_data = create_presigned_post(file_key)
-  if not presigned_data:
-    raise HTTPException(status_code=500, detail="Failed to generate presigned URL")
-  
-  return {
-    "data": presigned_data,
-    "file_key": file_key,
-  }
+# --- Attachments Endpoints ---
 
-# 2. Confirm Upload & Save to DB (Step 2 of Upload)
-@app.post("/incidents/{incident_id}/attachments/complete", response_model=AttachmentRead)
-def add_attachment(
-  incident_id: UUID,
-  request: AttachmentCompleteRequest,
-  db: Session = Depends(get_db),
-  current_user: models.User = Depends(get_current_user),
-  current_org_id: UUID = Depends(get_current_org_id)
-):
-  incident = db.query(models.Incident).filter(models.Incident.id == incident_id, models.Incident.organization_id == current_org_id).first()
-  if not incident:
-    raise HTTPException(status_code=404, detail="Incident not found")
-  
-  # Create a DB Record for the attachment
-  attachment = models.IncidentAttachment(
-    incident_id=incident_id,
-    file_name=request.file_name,
-    file_key=request.file_key,
-    uploaded_by=current_user.id
-  )
-  
-  db.add(attachment)
-  db.commit()
-  db.refresh(attachment)
-  
-  # Construct a public URL for the uploaded file
-  file_url = f"{S3_EXTERNAL_ENDPOINT}/{BUCKET_NAME}/{request.file_key}"
-  
-  return {
-    "id": attachment.id,
-    "file_name": attachment.file_name,
-    "file_url": file_url,
-    "uploaded_by": current_user.full_name,
-    "created_at": attachment.created_at
-  }
-  
-# 3. List Attachments for an Incident
 @app.get("/incidents/{incident_id}/attachments", response_model=List[AttachmentRead])
-def get_attachments(
+def list_attachments(
   incident_id: UUID,
-  db: Session = Depends(get_db),
-  current_org_id: UUID = Depends(get_current_org_id)
+  service: AttachmentService = Depends(get_attachment_service),
+  org_id: UUID = Depends(get_current_org_id)
 ):
-  # Ensure incident belongs to user's org
-  incident = db.query(models.Incident).filter(
-    models.Incident.id == incident_id, 
-    models.Incident.organization_id == current_org_id
-  ).first()
-  
-  if not incident:
-    raise HTTPException(status_code=404, detail="Incident not found")
-  
-  attachments = db.query(models.IncidentAttachment)\
-    .filter(models.IncidentAttachment.incident_id == incident_id)\
-    .all()
-  
-  # Format response with full file URLs
-  results = []
-  for att in attachments:
-    uploader = db.query(models.User).filter(models.User.id == att.uploaded_by).first()
-    uploader_name = uploader.full_name if uploader else "Unknown"
-    
-    results.append({
-      "id": att.id,
-      "file_name": att.file_name,
-      "file_url": f"{S3_EXTERNAL_ENDPOINT}/{BUCKET_NAME}/{att.file_key}",
-      "uploaded_by": uploader_name,
-      "created_at": att.created_at
-    })
-    
-  return results
+  """
+  List all attachments for a specific incident.
+    1. Verify incident ownership.
+    2. Fetch attachments from the repository.
+    3. Format and return attachment details with URLs.
+  """
+  return service.get_incident_attachments(incident_id, org_id)
 
-# 4. Delete Attachment
 @app.delete("/incidents/{incident_id}/attachments/{attachment_id}")
 def delete_attachment(
   incident_id: UUID,
   attachment_id: UUID,
-  db: Session = Depends(get_db),
-  current_user: models.User = Depends(get_current_user),
-  current_org_id: UUID = Depends(get_current_org_id)
+  service: AttachmentService = Depends(get_attachment_service),
+  user: models.User = Depends(get_current_user),
+  org_id: UUID = Depends(get_current_org_id)
 ):
-  attachment = db.query(models.IncidentAttachment).filter(
-    models.IncidentAttachment.id == attachment_id,
-    models.IncidentAttachment.incident_id == incident_id,
-    models.IncidentAttachment.organization_id == current_org_id
-  ).first()
-  
-  if not attachment:
-    raise HTTPException(status_code=404, detail="Attachment not found")
-  
-  if current_user.role != "ADMIN" and attachment.uploaded_by != current_user.id:
-    raise HTTPException(status_code=403, detail="Not authorized to delete this attachment")
-  
-  try:
-    try:
-      s3_client = get_s3_client()
-      s3_client.delete_object(Bucket=BUCKET_NAME, Key=attachment.file_key)
-    except Exception as e:
-      print(f"⚠️ Warning: Failed to delete file from MinIO: {e}")
-    
-    db.delete(attachment)
-    db.commit()
-  except Exception as e:
-    db.rollback()
-    raise HTTPException(status_code=500, detail=str(e))
-    
-  return {"id": attachment_id, "message": "Attachment deleted successfully"}
+  """
+  Delete an attachment from an incident.
+    1. Verify attachment existence and incident ownership.
+    2. Enforce RBAC (Admin or uploader only).
+    3. Delete from S3 and database.
+  """
+  return service.remove_attachment(attachment_id, incident_id, org_id, user)
+
+@app.post("/incidents/{incident_id}/attachments/sign")
+def sign_upload(
+  incident_id: UUID, 
+  request: AttachmentSignRequest,
+  service: AttachmentService = Depends(get_attachment_service),
+  org_id: UUID = Depends(get_current_org_id)
+):
+  """
+  Generate a presigned URL for uploading an attachment to an incident.
+    1. Verify incident ownership.
+    2. Generate presigned POST data.
+    3. Return presigned data to client.
+  """
+  return service.generate_upload_url(incident_id, org_id, request.file_name)
+
+@app.post("/incidents/{incident_id}/attachments/complete")
+def complete_upload(
+    incident_id: UUID,
+    request: AttachmentCompleteRequest,
+    service: AttachmentService = Depends(get_attachment_service),
+    user: models.User = Depends(get_current_user),
+    org_id: UUID = Depends(get_current_org_id)
+):
+  """
+  Register the uploaded attachment in the database.
+    1. Verify incident ownership.
+    2. Create IncidentAttachment record.
+    3. Return attachment details.
+  """
+  return service.register_attachment(incident_id, org_id, user.id, request)
