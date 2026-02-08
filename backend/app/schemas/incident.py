@@ -3,7 +3,7 @@ from typing import Optional, List
 from uuid import UUID
 from datetime import datetime
 from app.core.fsm import IncidentStatus, VALID_TRANSITIONS
-from app.models import IncidentSeverity
+from app.db.models import IncidentSeverity
 
 class IncidentCreate(BaseModel):
   title: str

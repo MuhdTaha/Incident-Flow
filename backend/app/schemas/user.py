@@ -2,7 +2,7 @@ from pydantic import BaseModel, EmailStr, Field
 from uuid import UUID
 from datetime import datetime
 from typing import Optional
-from app.models import UserRole
+from app.db.models import UserRole
 
 # Base schema with shared fields
 class UserBase(BaseModel):

@@ -1,5 +1,5 @@
 # backend/tests/test_fsm.py
-from fsm import can_transition, IncidentStatus
+from app.core.fsm import can_transition, IncidentStatus
 
 def test_valid_transitions():
     # It should be allowed to go from DETECTED to INVESTIGATING, CLOSED or ESCALATED

@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from uuid import UUID
 from typing import List, Optional
-from app.models import User, Incident, IncidentEvent, Organization
+from app.db.models import User, Incident, IncidentEvent, Organization
 
 class UserRepository:
   def __init__(self, db: Session):

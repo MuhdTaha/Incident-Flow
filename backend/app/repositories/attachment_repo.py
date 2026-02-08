@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from uuid import UUID
 from typing import List, Optional
-from app.models import IncidentAttachment
+from app.db.models import IncidentAttachment
 
 class AttachmentRepository:
   def __init__(self, db: Session):

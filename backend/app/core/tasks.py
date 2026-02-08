@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 from app.core.celery_app import celery
 from app.db.session import SessionLocal
-import app.models as models
+import app.db.models as models
 
 SMTP_HOST = os.getenv("SMTP_HOST", "localhost")
 SMTP_PORT = int(os.getenv("SMTP_PORT", 1025))

@@ -4,7 +4,7 @@ from typing import List
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app import models
+from app.db import models
 from app.schemas import incident as schemas
 from app.repositories.incident_repo import IncidentRepository
 from app.core.tasks import send_incident_alert_email

@@ -60,8 +60,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
-      - INTERNAL_API_URL=http://backend:8000
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+      - INTERNAL_API_URL=http://backend:8000/api/v1
     depends_on:
       - backend
     volumes:
@@ -121,7 +121,7 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/0
     volumes:
       - ./backend:/app       # mount backend code for live reload
-    command: celery -A celery_app.celery beat --loglevel=info
+    command: celery -A app.core.celery_app.celery beat --loglevel=info
   
   # 8. MinIO Object Storage
   minio:

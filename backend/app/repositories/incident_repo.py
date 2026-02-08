@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from uuid import UUID
 from typing import List, Optional
-from app.models import Incident, IncidentEvent, IncidentAttachment
+from app.db.models import Incident, IncidentEvent, IncidentAttachment
 
 class IncidentRepository:
   def __init__(self, db: Session):

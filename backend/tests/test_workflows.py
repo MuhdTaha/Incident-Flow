@@ -1,10 +1,10 @@
 # backend/tests/test_workflows.py
 import pytest
 import uuid
-from main import app
-from database import get_db
-from app.models import User, UserRole, IncidentStatus, Incident, Organization
-from deps import get_current_user
+from app.main import app
+from app.db.session import get_db
+from app.db.models import User, UserRole, IncidentStatus, Incident, Organization
+from app.api.deps import get_current_user
 
 # --- Fixtures ---
 

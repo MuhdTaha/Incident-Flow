@@ -5,7 +5,7 @@ from pytest import Session
 from app.repositories.attachment_repo import AttachmentRepository
 from app.repositories.incident_repo import IncidentRepository
 from app.core.storage import create_presigned_post, get_s3_client, BUCKET_NAME, S3_EXTERNAL_ENDPOINT
-from app.models import IncidentAttachment, User
+from app.db.models import IncidentAttachment, User
 
 class AttachmentService:
   def __init__(self, db: Session):

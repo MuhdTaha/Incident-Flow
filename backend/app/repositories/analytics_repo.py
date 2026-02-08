@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, text
 from uuid import UUID
 from datetime import datetime, timedelta
-import app.models as models
+import app.db.models as models
 
 class AnalyticsRepository:
   def __init__(self, db: Session):

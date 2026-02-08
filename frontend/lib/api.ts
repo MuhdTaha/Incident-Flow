@@ -7,8 +7,8 @@ const isServer = typeof window === 'undefined';
 // - Server: Talk directly to the "backend" container (internal Docker DNS)
 // - Client: Talk to "localhost" (your browser's network)
 const API_URL = isServer
-  ? process.env.INTERNAL_API_URL || "http://backend:8000"
-  : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  ? process.env.INTERNAL_API_URL || "http://backend:8000/api/v1"
+  : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
 export async function authFetch(endpoint: string, options: RequestInit = {}) {
   // 3. Get the current session token

@@ -1,10 +1,10 @@
 # backend/tests/test_api.py
 import pytest
 import uuid
-from main import app
-from database import get_db
-from deps import get_current_user
-from app.models import User, UserRole, Organization
+from app.main import app
+from app.db.session import get_db
+from app.api.deps import get_current_user
+from app.db.models import User, UserRole, Organization
 from fastapi import Depends
 
 @pytest.fixture

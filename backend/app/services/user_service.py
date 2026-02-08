@@ -1,7 +1,6 @@
 from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from app import models
 from app.schemas import user as schemas
 from app.repositories.user_repo import UserRepository
 

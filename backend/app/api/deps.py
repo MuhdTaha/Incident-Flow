@@ -10,7 +10,12 @@ from uuid import UUID
 from dotenv import load_dotenv
 
 from app.db.session import get_db
-import app.models as models
+import app.db.models as models
+
+from app.services.incident_service import IncidentService
+from app.services.user_service import UserService
+from app.services.analytics_service import AnalyticsService
+from app.services.attachment_service import AttachmentService
 
 load_dotenv()
 
@@ -73,7 +78,21 @@ class RoleChecker:
         detail=f"Operation not permitted. Requires one of: {self.allowed_roles}"
       )
     return user
-  
-# --- Role Checkers ---
+
 require_admin = RoleChecker(["ADMIN"])
 require_manager = RoleChecker(["ADMIN", "MANAGER"])
+
+
+# --- Dependency Helper ---
+
+def get_incident_service(db: Session = Depends(get_db)) -> IncidentService:
+  return IncidentService(db)
+
+def get_user_service(db: Session = Depends(get_db)) -> UserService:
+  return UserService(db)
+
+def get_analytics_service(db: Session = Depends(get_db)) -> AnalyticsService:
+  return AnalyticsService(db)
+
+def get_attachment_service(db: Session = Depends(get_db)) -> AttachmentService:
+  return AttachmentService(db)

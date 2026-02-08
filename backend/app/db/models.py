@@ -1,12 +1,11 @@
-# backend/app/models.py
+# backend/app/db/models.py
 
-from datetime import datetime
 from os import name
 import uuid
 from sqlalchemy import Column, String, ForeignKey, DateTime, UUID, Enum as SQLEnum, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from database import Base
+from app.db.session import Base
 import enum
 
 # --- Enums ---
