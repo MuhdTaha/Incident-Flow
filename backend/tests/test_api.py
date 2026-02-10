@@ -57,7 +57,7 @@ def test_create_incident(client, db, auth_override, test_organization):
     "severity": "SEV1",
     "organization_id": str(test_organization.id)
   }
-  response = client.post("/incidents", json=payload)
+  response = client.post("/api/v1/incidents", json=payload)
   
   if response.status_code != 200:
     print("DEBUG ERROR:", response.json())
@@ -75,10 +75,10 @@ def test_get_incidents(client, db, auth_override, test_organization):
     "severity": "SEV1",
     "organization_id": str(test_organization.id)
   }
-  client.post("/incidents", json=payload)
+  client.post("/api/v1/incidents", json=payload)
 
   # Get Data
-  response = client.get("/incidents")
+  response = client.get("/api/v1/incidents")
 
   assert response.status_code == 200
   data = response.json()

@@ -36,6 +36,6 @@ class CommentRequest(BaseModel):
   comment: str
     
 class IncidentUpdate(BaseModel):
-  severity: Optional[str] = None
-  owner_id: Optional[str] = None
+  severity: Optional[IncidentSeverity] = None
+  owner_id: Optional[UUID] = None
   comment: Optional[str] = None

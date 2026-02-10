@@ -25,7 +25,17 @@ def create_incident(
   current_org_id: UUID = Depends(get_current_org_id)
 ):
   new_incident = service.create_incident(incident, current_user, current_org_id)
-  return {"id": str(new_incident.id), "message": "Incident created successfully"}
+  payload = {
+    "id": str(new_incident.id),
+    "title": new_incident.title,
+    "description": new_incident.description,
+    "severity": new_incident.severity.value if hasattr(new_incident.severity, "value") else str(new_incident.severity),
+    "status": new_incident.status.value if hasattr(new_incident.status, "value") else str(new_incident.status),
+    "owner_id": str(new_incident.owner_id) if new_incident.owner_id else None,
+    "updated_at": new_incident.updated_at,
+  }
+  payload["message"] = "Incident created successfully"
+  return payload
 
 @router.post("/{incident_id}/transition")
 def transition_incident(
@@ -36,10 +46,14 @@ def transition_incident(
   current_org_id: UUID = Depends(get_current_org_id)
 ):
   try:
-    service.transition_incident(incident_id, request, current_user, current_org_id)
+    updated = service.transition_incident(incident_id, request, current_user, current_org_id)
   except HTTPException as he:
     raise he
-  return {"id": str(incident_id), "message": f"Incident transitioned to {request.new_state} successfully"}
+  return {
+    "id": str(incident_id),
+    "status": updated.status.value,
+    "message": f"Incident transitioned to {request.new_state} successfully"
+  }
 
 @router.patch("/{incident_id}")
 def update_incident(
@@ -50,10 +64,20 @@ def update_incident(
   current_org_id: UUID = Depends(get_current_org_id)
 ):
   try:
-    service.update_incident(incident_id, request, current_user, current_org_id)
+    updated = service.update_incident(incident_id, request, current_user, current_org_id)
   except HTTPException as he:
     raise he
-  return {"id": str(incident_id), "message": "Incident updated successfully"}
+  payload = {
+    "id": str(updated.id),
+    "title": updated.title,
+    "description": updated.description,
+    "severity": updated.severity.value if hasattr(updated.severity, "value") else str(updated.severity),
+    "status": updated.status.value if hasattr(updated.status, "value") else str(updated.status),
+    "owner_id": str(updated.owner_id) if updated.owner_id else None,
+    "updated_at": updated.updated_at,
+  }
+  payload["message"] = "Incident updated successfully"
+  return payload
 
 @router.post("/{incident_id}/comment")
 def comment_on_incident(

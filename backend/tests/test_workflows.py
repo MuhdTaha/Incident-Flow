@@ -65,33 +65,33 @@ def test_full_incident_lifecycle(client, db, engineer_user, incident_id):
     "new_state": "INVESTIGATING",
     "comment": "Starting investigation now.",
   }
-  response = client.post(f"/incidents/{incident_id}/transition", json=transition_payload)
+  response = client.post(f"/api/v1/incidents/{incident_id}/transition", json=transition_payload)
   assert response.status_code == 200
   assert response.json()["status"] == "INVESTIGATING"
 
   # 2. Test Invalid Transition (INVESTIGATING -> DETECTED is not allowed)
   invalid_payload = {"new_state": "DETECTED"}
-  response = client.post(f"/incidents/{incident_id}/transition", json=invalid_payload)
+  response = client.post(f"/api/v1/incidents/{incident_id}/transition", json=invalid_payload)
   assert response.status_code == 400 # Bad Request
 
   # 3. Test Commenting
   comment_payload = {"comment": "Found the root cause: missing index."}
-  response = client.post(f"/incidents/{incident_id}/comment", json=comment_payload)
+  response = client.post(f"/api/v1/incidents/{incident_id}/comment", json=comment_payload)
   assert response.status_code == 200
 
   # 4. Verify Audit Logs (The 'Events' endpoint)
-  response = client.get(f"/incidents/{incident_id}/events")
+  response = client.get(f"/api/v1/incidents/{incident_id}/events")
   assert response.status_code == 200
   events = response.json()
   
   # 5. Check for users list
-  response = client.get("/users")
+  response = client.get("/api/v1/users")
   assert response.status_code == 200
   users = response.json()
   assert len(users) > 0
   
   # 6. Check the list of incidents to ensure our incident is present
-  response = client.get("/incidents")
+  response = client.get("/api/v1/incidents")
   assert response.status_code == 200
   incidents = response.json()
   assert any(i["id"] == incident_id for i in incidents)
@@ -137,7 +137,7 @@ def test_rbac_assignment_restriction(client, db, engineer_user, test_organizatio
     "owner_id": str(other_user.id) # <--- This should be forbidden for Engineers
   }
   
-  response = client.post("/incidents", json=payload)
+  response = client.post("/api/v1/incidents", json=payload)
   
   assert response.status_code == 403
   assert "Not authorized" in response.json()["detail"]
@@ -150,7 +150,7 @@ def test_incident_not_found(client, engineer_user):
   app.dependency_overrides[get_current_user] = lambda: engineer_user
   
   fake_id = str(uuid.uuid4())
-  response = client.post(f"/incidents/{fake_id}/transition", json={"new_state": "CLOSED"})
+  response = client.post(f"/api/v1/incidents/{fake_id}/transition", json={"new_state": "CLOSED"})
   
   assert response.status_code == 404
   
@@ -179,14 +179,14 @@ def test_tenant_isolation(client, db, incident_id):
   app.dependency_overrides[get_current_user] = lambda: competitor_user
 
   # 4. Try to access the original incident (belonging to Test Org)
-  response = client.get(f"/incidents/{incident_id}/events")
+  response = client.get(f"/api/v1/incidents/{incident_id}/events")
   
   # Should return 404 (Not Found) or 403 (Forbidden)
   # 404 is usually safer (don't reveal the ID exists)
   assert response.status_code in [403, 404] 
   
   # 5. Try to list incidents - should return empty list or only their own
-  response = client.get("/incidents")
+  response = client.get("/api/v1/incidents")
   incidents = response.json()
   
   # Ensure the original incident ID is NOT in the list

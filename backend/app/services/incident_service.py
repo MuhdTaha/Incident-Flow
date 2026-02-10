@@ -28,7 +28,7 @@ class IncidentService:
     new_incident = models.Incident(
       title=data.title,
       description=data.description,
-      severity=data.severity.value,
+      severity=data.severity,
       owner_id=final_owner_id,
       status=IncidentStatus.DETECTED,
       organization_id=org_id
@@ -107,9 +107,10 @@ class IncidentService:
     changes = []
     
     # Check for severity change
-    if data.severity and data.severity.value != incident.severity:
-      changes.append(("SEVERITY_CHANGE", str(incident.severity), str(data.severity.value)))
-      incident.severity = data.severity.value
+    if data.severity and data.severity != incident.severity:
+      old_severity = incident.severity.value if hasattr(incident.severity, "value") else str(incident.severity)
+      changes.append(("SEVERITY_CHANGE", old_severity, data.severity.value))
+      incident.severity = data.severity
       
     # Check for owner change
     if data.owner_id and data.owner_id != incident.owner_id:
@@ -131,7 +132,7 @@ class IncidentService:
         old_value=old_val,
         new_value=new_val,
         # Use the comment provided in the request, or generate a system one
-        comment=data.comment or f"{event_type.lower()} from {old_val} to {new_val}"
+        comment=data.comment or f"{event_type} from {old_val} to {new_val}"
       )
 
       self.repo.add_event(audit)

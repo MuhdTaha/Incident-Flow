@@ -8,9 +8,15 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from fastapi.testclient import TestClient
 from app.main import app
+from app.core.celery_app import celery
+from app.core.tasks import send_incident_alert_email
 from app.db.session import get_db, Base
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Run Celery tasks locally during tests to avoid broker/backend connections.
+celery.conf.task_always_eager = True
+celery.conf.task_eager_propagates = True
 
 # 1. Setup In-Memory Database
 SQLALCHEMY_DATABASE_URL = "sqlite://"  # Memory only
@@ -64,3 +70,12 @@ def client():
   with TestClient(app) as c:
     yield c
   Base.metadata.drop_all(bind=engine)    # Cleanup after tests are done
+
+# 4. Disable async side effects (emails) in tests
+@pytest.fixture(autouse=True)
+def disable_celery_tasks(monkeypatch):
+  def _noop(*args, **kwargs):
+    return None
+
+  monkeypatch.setattr(send_incident_alert_email, "delay", _noop)
+  yield
