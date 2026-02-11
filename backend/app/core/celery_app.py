@@ -9,7 +9,7 @@ celery = Celery(
   "incidentflow",
   broker=BROKER_URL,
   backend=BROKER_URL,
-  include=["tasks"]
+  include=["app.core.tasks"]
 )
 
 # Optional configuration
@@ -24,7 +24,7 @@ celery.conf.update(
 # Beat Schedule
 celery.conf.beat_schedule = {
   "check-slas-every-minute": {
-    "task": "tasks.check_sla_breaches", # The function name
+    "task": "app.core.tasks.check_sla_breaches", # The function name
     "schedule": crontab(minute=0), # Run every 60 minutes
   }
 }

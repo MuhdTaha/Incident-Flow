@@ -24,7 +24,7 @@ services:
     volumes:
       - ./backend:/app       # mount backend code for live reload
     # Use --reload for development; remove in production
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   # 2. Worker Service (Celery)
   worker:
@@ -45,7 +45,7 @@ services:
       - SMTP_PORT=1025
     volumes:
       - ./backend:/app       # mount backend code for live reload
-    command: celery -A celery_app.celery worker --loglevel=info
+    command: celery -A app.core.celery_app.celery worker --loglevel=info
 
   # 3. Frontend Service
   frontend:
