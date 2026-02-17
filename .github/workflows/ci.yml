@@ -63,11 +63,24 @@ jobs:
         run: |
           cd frontend
           npm ci
-      
-      - name: Run Frontend Tests
+
+      - name: Install Playwright Browsers
         run: |
           cd frontend
-          npm test
+          npx playwright install --with-deps
+      
+      - name: Run Frontend Unit Tests (Jest)
+        run: |
+          cd frontend
+          npm test:unit
+
+      - name: Run Frontend E2E Tests (Playwright)
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY }}
+        run: |
+          cd frontend
+          npm test:e2e
 
       - name: Run Build
         env:

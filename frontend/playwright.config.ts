@@ -21,6 +21,12 @@ export default defineConfig({
       dependencies: ['setup'], // Run setup before this project
     },
   ],
+  webServer: {
+    command: 'npm run build && npm run start', // Build and start prod server for testing
+    url: 'http://localhost:3000',
+    reuseExistingServer: !process.env.CI, // Reuse server if not in CI environment
+    timeout: 120 * 1000, // Give the server 2 minutes to start up
+  },
   use: {
     baseURL: 'http://localhost:3000',
   },
