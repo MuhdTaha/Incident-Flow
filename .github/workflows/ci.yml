@@ -72,7 +72,7 @@ jobs:
       - name: Run Frontend Unit Tests (Jest)
         run: |
           cd frontend
-          npm test:unit
+          npm run test:unit
 
       - name: Run Frontend E2E Tests (Playwright)
         env:
@@ -80,7 +80,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY }}
         run: |
           cd frontend
-          npm test:e2e
+          npm run test:e2e
 
       - name: Run Build
         env:
