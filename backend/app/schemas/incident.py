@@ -18,6 +18,7 @@ class IncidentRead(BaseModel):
   severity: str
   status: str
   owner_id: Optional[UUID]
+  created_at: datetime
   updated_at: datetime
   
   @computed_field

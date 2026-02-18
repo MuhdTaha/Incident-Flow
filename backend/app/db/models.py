@@ -91,7 +91,7 @@ class IncidentEvent(Base):
   id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
   incident_id = Column(UUID(as_uuid=True), ForeignKey("incidents.id"), nullable=False)
   actor_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True) # Nullable for system events
-  event_type = Column(String, nullable=False) # e.g., 'STATUS_CHANGE', 'COMMENT'
+  event_type = Column(String, nullable=False) # e.g., 'STATUS_CHANGE', 'COMMENT', 'CREATION', 'SLA_BREACH'
   old_value = Column(String)
   new_value = Column(String)
   comment = Column(Text)

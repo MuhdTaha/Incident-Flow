@@ -3,6 +3,13 @@ import { render, screen, waitFor } from '@testing-library/react'
 import IncidentHistory from '@/app/components/IncidentHistory'
 import { authFetch } from '@/lib/api'
 
+jest.mock('@/context/UserContext', () => ({
+  useUserDirectory: () => ({
+    users: [],
+    userMap: {},
+  }),
+}))
+
 jest.mock('@/components/ui/sheet', () => ({
   Sheet: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   SheetContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
@@ -18,9 +25,13 @@ jest.mock('@/components/ui/tabs', () => ({
   TabsContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }))
 
-jest.mock('../app/components/AttachmentManager', () => () => (
-  <div data-testid="attachment-manager" />
-))
+jest.mock('../app/components/AttachmentManager', () => {
+  const MockAttachmentManager = () => (
+    <div data-testid="attachment-manager" />
+  )
+  MockAttachmentManager.displayName = 'AttachmentManager'
+  return MockAttachmentManager
+})
 
 jest.mock('@/lib/api', () => ({
   authFetch: jest.fn(),
@@ -65,7 +76,7 @@ describe('IncidentHistory', () => {
     })
 
     expect(await screen.findByText('Investigating')).toBeInTheDocument()
-    expect(screen.getByText('Status Update')).toBeInTheDocument()
+    expect(screen.getByText('Status Updated')).toBeInTheDocument()
   })
 
   it('renders empty state when no events', async () => {

@@ -1,10 +1,11 @@
 import time
 from uuid import UUID
 from fastapi import HTTPException
-from pytest import Session
+from sqlalchemy.orm import Session
 from app.repositories.attachment_repo import AttachmentRepository
 from app.repositories.incident_repo import IncidentRepository
 from app.core.storage import create_presigned_post, get_s3_client, BUCKET_NAME, S3_EXTERNAL_ENDPOINT
+from app.db import models
 from app.db.models import IncidentAttachment, User
 
 class AttachmentService:
@@ -34,7 +35,19 @@ class AttachmentService:
       file_key=data.file_key,
       uploaded_by=user_id
     )
-    return self.repo.create(new_att)
+    created_attachment = self.repo.create(new_att)
+    
+    # Create incident event log for attachment upload
+    audit = models.IncidentEvent(
+      incident_id=incident_id,
+      actor_id=user_id,
+      organization_id=org_id,
+      event_type="ATTACHMENT_UPLOAD",
+      comment=f"Uploaded attachment: {data.file_name}"
+    )
+    self.incident_repo.add_event(audit)
+    
+    return created_attachment
 
   def get_incident_attachments(self, incident_id: UUID, org_id: UUID):
     # Ensure incident exists/access allowed
@@ -66,6 +79,16 @@ class AttachmentService:
       get_s3_client().delete_object(Bucket=BUCKET_NAME, Key=att.file_key)
     except Exception as e:
       print(f"S3 Delete failed: {e}")
+      
+    # 2. Audit log for deletion
+    audit = models.IncidentEvent(
+      incident_id=incident_id,
+      actor_id=current_user.id,
+      organization_id=org_id,
+      event_type="ATTACHMENT_DELETE",
+      comment=f"Deleted attachment: {att.file_name}"
+    )
+    self.incident_repo.add_event(audit)
 
-    # 2. Delete from DB
+    # 3. Delete from DB
     self.repo.delete(att)

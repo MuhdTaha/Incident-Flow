@@ -26,7 +26,12 @@ type Attachment = {
   created_at: string;
 };
 
-export default function AttachmentManager({ incidentId }: { incidentId: string }) {
+type AttachmentManagerProps = {
+  incidentId: string;
+  onAttachmentChange?: () => void;
+};
+
+export default function AttachmentManager({ incidentId, onAttachmentChange }: AttachmentManagerProps) {
   const { user } = useAuth();
   const { uploadFile, status, progress, error, reset } = useFileUpload();
 
@@ -34,10 +39,6 @@ export default function AttachmentManager({ incidentId }: { incidentId: string }
   const [loadingList, setLoadingList] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-
-  if (!user) return null;
-  const name = user.user_metadata?.full_name?.split(" ").filter((n: string) => n) || [];
-  const role = user.app_metadata.role? user.app_metadata.role : "User";
 
   // 1. Fetch existing attachments
   const fetchAttachments = useCallback(async () => {
@@ -56,6 +57,10 @@ export default function AttachmentManager({ incidentId }: { incidentId: string }
   useEffect(() => {
     fetchAttachments();
   }, [fetchAttachments]);
+
+  if (!user) return null;
+  const name = user.user_metadata?.full_name?.split(" ").filter((n: string) => n) || [];
+  const role = user.app_metadata.role? user.app_metadata.role : "User";
 
   // 2. Handle Drag and Drop Events
   const onDragOver = (e: React.DragEvent) => {
@@ -100,6 +105,8 @@ export default function AttachmentManager({ incidentId }: { incidentId: string }
     // Note: delay slightly to ensure MinIO consistency
     setTimeout(() => {
       fetchAttachments();
+      // Refresh audit log to show ATTACHMENT_UPLOAD event
+      if (onAttachmentChange) onAttachmentChange();
       // Reset upload state after a short delay
       setTimeout(reset, 3000);
     }, 1000);
@@ -136,6 +143,8 @@ export default function AttachmentManager({ incidentId }: { incidentId: string }
       if (!res.ok) throw new Error("Failed to delete attachment");
       
       setAttachments(prev => prev.filter(a => a.id !== attId));
+      // Refresh audit log to show ATTACHMENT_DELETE event
+      if (onAttachmentChange) onAttachmentChange();
     } catch (e) {
       console.error(e);
       alert("Failed to delete attachment");

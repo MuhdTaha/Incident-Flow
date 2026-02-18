@@ -111,7 +111,7 @@ describe('IncidentActionModal', () => {
     })
   })
 
-  it('disables edit action for non-managers', () => {
+  it('disables edit action for non-engineers', async () => {
     mockUserRole = 'ENGINEER'
     mockAuthFetch.mockResolvedValueOnce({ ok: true, json: async () => [] })
 
@@ -124,10 +124,12 @@ describe('IncidentActionModal', () => {
       />
     )
 
-    expect(screen.getByRole('button', { name: 'Edit' })).toBeDisabled()
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Edit' })).toBeDisabled()
+    })
   })
 
-  it('enables edit action for managers', () => {
+  it('enables edit action for managers', async () => {
     mockUserRole = 'MANAGER'
     mockAuthFetch.mockResolvedValueOnce({ ok: true, json: async () => [] })
 
@@ -140,6 +142,8 @@ describe('IncidentActionModal', () => {
       />
     )
 
-    expect(screen.getByRole('button', { name: 'Edit' })).not.toBeDisabled()
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Edit' })).not.toBeDisabled()
+    })
   })
 })

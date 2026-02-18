@@ -49,6 +49,7 @@ type Incident = {
   description: string;
   owner_id: string;
   allowed_transitions: string[];
+  created_at: string;
   updated_at: string;
 };
 
@@ -220,6 +221,9 @@ export default function IncidentDashboard() {
         incidentTitle={selectedIncident?.title || ""}
         incidentDescription={selectedIncident?.description || ""}
         incidentSeverity={selectedIncident?.severity || ""}
+        incidentStatus={selectedIncident?.status || ""}
+        incidentAssignee={userMap[selectedIncident?.owner_id || ""]?.full_name || null}
+        createdAt={selectedIncident ? new Date(selectedIncident.created_at).toLocaleString() : ""}
         isOpen={!!selectedIncidentId} 
         onClose={() => setSelectedIncidentId(null)} 
       />

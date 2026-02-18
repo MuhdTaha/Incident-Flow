@@ -62,10 +62,19 @@ export default function IncidentActionModal({ incident, isOpen, onClose, onSucce
   // Fetch Users when modal opens (for reassignment)
   useEffect(() => {
     if (isOpen) {
+      let isMounted = true;
       authFetch("/users")
         .then((res) => res.json())
-        .then((data) => setUsers(data))
+        .then((data) => {
+          if (isMounted) {
+            setUsers(data);
+          }
+        })
         .catch((err) => console.error("Failed to fetch users", err));
+      
+      return () => {
+        isMounted = false;
+      };
     }
   }, [isOpen]);
 
