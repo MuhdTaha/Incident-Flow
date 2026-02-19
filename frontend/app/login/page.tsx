@@ -11,44 +11,25 @@ import { AlertCircle, Lock } from "lucide-react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
-  const [fullName, setFullName] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isSignUp, setIsSignUp] = useState(false); // Toggle between Login/Signup
   const router = useRouter();
 
-  const handleAuth = async (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
     try {
-      let result;
-      if (isSignUp) {
-        // Sign Up
-        result = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { full_name: fullName }, // Pass metadata for our DB trigger
-          },
-        });
-      } else {
-        // Sign In
-        result = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-      }
+      const result = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
       if (result.error) throw result.error;
 
-      if (isSignUp) {
-        alert("Check your email for the confirmation link!");
-      } else {
-        router.push("/"); // Redirect to dashboard on success
-      }
+      router.push("/"); // Redirect to dashboard on success
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -65,11 +46,11 @@ export default function LoginPage() {
             IncidentFlow
           </CardTitle>
           <p className="text-center text-slate-500">
-            {isSignUp ? "Create an account" : "Sign in to your account"}
+            Sign in to your account
           </p>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleAuth} className="space-y-4">
+          <form onSubmit={handleSignIn} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -81,19 +62,6 @@ export default function LoginPage() {
                 required
               />
             </div>
-            {isSignUp && 
-              <div className="space-y-2">
-                <Label htmlFor="full_name">Full Name</Label>
-                <Input
-                  id="full_name"
-                  type="text"
-                  placeholder="John Doe"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  required
-                />
-              </div>   
-            }
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <Input
@@ -113,7 +81,7 @@ export default function LoginPage() {
             )}
 
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Processing..." : isSignUp ? "Sign Up" : "Sign In"}
+              {loading ? "Processing..." : "Sign In"}
             </Button>
           </form>
         </CardContent>
@@ -121,9 +89,9 @@ export default function LoginPage() {
           <Button
             variant="link"
             className="text-sm text-slate-500"
-            onClick={() => setIsSignUp(!isSignUp)}
+            onClick={() => router.push("/register")}
           >
-            {isSignUp ? "Already have an account? Sign In" : "Don't have an account? Sign Up"}
+            Don't have an account? Sign Up
           </Button>
         </CardFooter>
       </Card>

@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, Building2, UserPlus, Mail, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2, Mail, AlertCircle, Lock } from "lucide-react";
 import Link from "next/link";
 
 export default function RegisterPage() {
@@ -136,17 +136,16 @@ export default function RegisterPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md shadow-lg">
         
         {/* HEADER */}
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold">
-            {viewState === "signup" && "Create Account"}
-            {viewState === "verify_email" && "Check your Email"}
-            {viewState === "org" && "Setup Organization"}
+          <CardTitle className="text-2xl font-bold text-center flex items-center justify-center gap-2">
+            <Lock className="h-6 w-6 text-blue-600" />
+            IncidentFlow
           </CardTitle>
-          <CardDescription>
-            {viewState === "signup" && "Enter your details to get started."}
+          <CardDescription className="text-center">
+            {viewState === "signup" && "Create an account to get started."}
             {viewState === "verify_email" && "We sent you a confirmation link."}
             {viewState === "org" && "Name your workspace to complete setup."}
           </CardDescription>
@@ -156,7 +155,6 @@ export default function RegisterPage() {
           {error && (
             <Alert variant="destructive" className="mb-4">
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Error</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
@@ -197,8 +195,7 @@ export default function RegisterPage() {
                 />
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
-                Create Account
+                {loading ? "Processing..." : "Create Account"}
               </Button>
             </form>
           )}
@@ -237,15 +234,14 @@ export default function RegisterPage() {
                 </p>
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Building2 className="mr-2 h-4 w-4" />}
-                Complete Setup
+                {loading ? "Processing..." : "Complete Setup"}
               </Button>
             </form>
           )}
         </CardContent>
         
         {/* FOOTER */}
-        <CardFooter className="flex justify-center">
+        <CardFooter className="justify-center">
           {viewState === "signup" && (
             <p className="text-sm text-slate-600">
               Already have an account?{" "}
@@ -255,7 +251,11 @@ export default function RegisterPage() {
             </p>
           )}
           {viewState === "org" && (
-            <Button variant="link" className="text-slate-500 text-xs" onClick={() => supabase.auth.signOut().then(() => setViewState("signup"))}>
+            <Button 
+              variant="link" 
+              className="text-sm text-slate-500"
+              onClick={() => supabase.auth.signOut().then(() => setViewState("signup"))}
+            >
               Sign out and create new account
             </Button>
           )}
