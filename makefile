@@ -36,7 +36,7 @@ test-backend: ## Run Python backend tests (Pytest)
 	$(DC) exec backend pytest
 
 test-frontend: ## Run Frontend unit tests (Jest)
-	$(DC) exec frontend npm test:unit
+	$(DC) exec frontend npm run test:unit
 
 test-e2e: ## Run Playwright E2E tests (Runs locally against Docker)
 	cd frontend && npx playwright test

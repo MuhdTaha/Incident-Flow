@@ -41,8 +41,8 @@ describe('IncidentFilters', () => {
   it('toggles severity and clears filters', () => {
     render(<Wrapper initial={baseFilters} />)
 
-    const sev1Button = screen.getByRole('button', { name: 'SEV1' })
-    fireEvent.click(sev1Button)
+    fireEvent.click(screen.getByRole('button', { name: 'Severity' }))
+    fireEvent.click(screen.getByLabelText('SEV1'))
 
     expect(screen.getByRole('button', { name: 'Clear All' })).toBeInTheDocument()
 
