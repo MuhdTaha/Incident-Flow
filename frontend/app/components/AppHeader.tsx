@@ -13,7 +13,7 @@ export default function AppHeader() {
   useEffect(() => {
     const fetchOrgProfile = async () => {
       try {
-        const res = await authFetch("/users/organization");
+        const res = await authFetch("/orgs/org_profile");
         if (res.ok) {
           const data = await res.json();
           setOrgName(data.name);

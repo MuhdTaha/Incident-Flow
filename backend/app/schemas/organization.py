@@ -1,11 +1,25 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from uuid import UUID
 from datetime import datetime
 from typing import Optional
 
+from app.schemas.common import OrgProfile
+from app.schemas.user import UserRead
+
 class OrgCreate(BaseModel):
   name: str
-  slug: str
+
+class OrgRegistrationResponse(BaseModel):
+  organization: OrgProfile
+  user: UserRead
+
+class InviteRequest(BaseModel):
+  email: EmailStr
+  role: str = "ENGINEER"
+  
+class InviteResponse(BaseModel):
+  message: str
+  user_id: UUID
 
 class OrgRead(BaseModel):
   id: UUID
@@ -18,3 +32,4 @@ class OrgRead(BaseModel):
 
 class OrgUpdate(BaseModel):
   name: Optional[str] = None
+  slug: Optional[str] = None

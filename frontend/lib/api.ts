@@ -10,6 +10,8 @@ const API_URL = isServer
   ? process.env.INTERNAL_API_URL || "http://backend:8000/api/v1"
   : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
+export { API_URL };
+
 export async function authFetch(endpoint: string, options: RequestInit = {}) {
   // 3. Get the current session token
   const { data: { session } } = await supabase.auth.getSession();

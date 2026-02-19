@@ -8,6 +8,7 @@ from jose import jwt, JWTError
 from sqlalchemy.orm import Session
 from uuid import UUID
 from dotenv import load_dotenv
+from jose import jwt, JWTError
 
 from app.db.session import get_db
 import app.db.models as models
@@ -56,6 +57,27 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     raise credentials_exception
       
   return user
+
+def get_current_user_id_from_token(token: str = Depends(oauth2_scheme)) -> dict:
+  """
+  Decodes the JWT and extracts the User ID without hitting the database.
+  Useful for operations that only need the User ID and not the full user object.
+  """
+  try:
+    if not SECRET_KEY:
+      raise ValueError("SUPABASE_JWT_SECRET is not set")
+    
+    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], options={"verify_aud": False})
+    user_id: str = payload.get("sub")
+    email: str = payload.get("email")
+    
+    if user_id is None:
+      raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+      
+    return {"id": user_id, "email": email}
+
+  except JWTError:
+    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate credentials")
 
 # --- Organization Checker ---
 def get_current_org_id(current_user: models.User = Depends(get_current_user)) -> UUID:

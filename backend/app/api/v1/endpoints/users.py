@@ -43,11 +43,3 @@ def delete_user(
   except HTTPException as he:
     raise he
   return {"id": str(user_id), "message": "User deleted successfully"}
-
-# Moving Organization profile here as it relates to user context
-@router.get("/organization", response_model=org_schemas.OrgProfile)
-def get_org_profile(
-  service: UserService = Depends(get_user_service),
-  current_org_id: UUID = Depends(get_current_org_id) 
-):
-  return service.get_org(current_org_id)

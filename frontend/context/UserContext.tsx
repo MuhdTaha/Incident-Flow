@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
 import { authFetch } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 type User = {
   id: string;
@@ -20,13 +21,23 @@ interface UserContextType {
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
+  const { session } = useAuth(); // Get the current session
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
 
   const fetchUsers = useCallback(async () => {
+    // Only fetch if there's an active session with a valid access token  
+    if (!session?.access_token) {
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await authFetch("/users");
+      if (res.status === 401) {
+        return;
+      }
+
       if (res.ok) {
         const data = await res.json();
         setUsers(data);
@@ -36,10 +47,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [session]);
 
-  // Initial fetch and refresh function
-  useEffect(() => { fetchUsers(); }, [fetchUsers]);
+  // Initial fetch when session becomes available
+  useEffect(() => { 
+    const isAuthPage = window.location.pathname.startsWith("/login") || window.location.pathname.startsWith("/register");
+
+    if (session && !isAuthPage) {
+      fetchUsers(); 
+    }
+  }, [fetchUsers, session]);
 
   // Create a memoized lookup table: { "uuid-123": { full_name: "...", role: "..." } }
   const userMap = useMemo(() => {

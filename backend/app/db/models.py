@@ -47,7 +47,7 @@ class Organization(Base):
 class User(Base):
   __tablename__ = "users"
 
-  id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+  id = Column(UUID(as_uuid=True), primary_key=True)
   email = Column(String, unique=True, nullable=False)
   full_name = Column(String, nullable=False)
   role = Column(SQLEnum(UserRole, name="user_role"), default=UserRole.ENGINEER, nullable=False)

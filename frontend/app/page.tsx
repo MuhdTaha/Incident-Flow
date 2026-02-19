@@ -54,6 +54,7 @@ type Incident = {
 };
 
 export default function IncidentDashboard() {
+  const router = useRouter();
   const { user } = useAuth();
   const { users, userMap } = useUserDirectory();
   const [incidents, setIncidents] = useState<Incident[]>([]);
@@ -71,12 +72,29 @@ export default function IncidentDashboard() {
     search: ""
   });
 
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!user) {
+      router.push("/login");
+    }
+  }, [user, router]);
+
   const fetchIncidents = async () => {
     setLoading(true);
     try {
       const res = await authFetch("/incidents");
-      const data = await res.json();
-      setIncidents(data);
+
+      // Handle "Unregistered User" case by redirecting to register
+      if (res.status === 401) {
+        console.warn("User not registered in backend. Redirecting to registration page.");
+        router.push("/register");
+        return;
+      }
+
+      if (res.ok) {
+        const data = await res.json();
+        setIncidents(data);
+      }
     } catch (e) {
       console.error("Failed to fetch incidents");
     } finally {
@@ -85,8 +103,10 @@ export default function IncidentDashboard() {
   };
 
   useEffect(() => {
-    fetchIncidents();
-  }, []);
+    if (user) {
+      fetchIncidents();
+    }
+  }, [user]);
 
   const selectedIncident = incidents.find(i => i.id === selectedIncidentId);
   const filteredIncidents = useMemo(() => {

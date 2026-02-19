@@ -3,6 +3,19 @@ import IncidentDashboard from '@/app/page'
 import { authFetch } from '@/lib/api'
 import '@testing-library/jest-dom'
 
+// Mock next/navigation
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: jest.fn(),
+    replace: jest.fn(),
+    back: jest.fn(),
+    forward: jest.fn(),
+    pathname: '/',
+  }),
+  usePathname: () => '/',
+  useSearchParams: () => new URLSearchParams(),
+}))
+
 // 1. Mock the API module
 jest.mock('@/lib/api', () => ({
   authFetch: jest.fn(),

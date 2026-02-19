@@ -34,13 +34,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     // 2. Listen for changes (Login, Logout, Auto-refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
       
-      if (!session) {
-        router.push("/login"); // Redirect to login if session ends
+      // Only redirect on explicit sign out, not on initial load or other events
+      if (event === 'SIGNED_OUT') {
+        router.push("/login");
       }
     });
 

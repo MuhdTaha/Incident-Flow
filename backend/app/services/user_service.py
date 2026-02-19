@@ -8,12 +8,6 @@ class UserService:
   def __init__(self, db: Session):
     self.repo = UserRepository(db)
     
-  def get_org(self, org_id: UUID):
-    org = self.repo.get_org(org_id)
-    if not org:
-      raise HTTPException(status_code=404, detail="Organization not found")
-    return org
-    
   def list_users(self, org_id: UUID):
     return self.repo.list_all(org_id)
 

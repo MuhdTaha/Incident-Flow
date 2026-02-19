@@ -63,7 +63,7 @@ def auth_override():
   
 def test_user_organization(client, db, admin_user, test_organization, other_organization):  
   app.dependency_overrides[get_current_user] = lambda: admin_user
-  response = client.get("/api/v1/users/organization")
+  response = client.get("/api/v1/orgs/org_profile")
   assert response.status_code == 200
   data = response.json()
   assert data["id"] == str(test_organization.id)
