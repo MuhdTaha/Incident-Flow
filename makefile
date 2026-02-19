@@ -16,8 +16,11 @@ help: ## Show this help message
 	@echo "Commands:"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
-up: ## Start the entire stack in detached mode
-	$(DC) up -d
+up: ## Start the entire stack
+	$(DC) up
+
+up b: ## Start stack in build mode (rebuilds images)
+	$(DC) up --build
 
 down: ## Stop and remove all containers
 	$(DC) down

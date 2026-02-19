@@ -23,7 +23,7 @@ celery.conf.update(
 
 # Beat Schedule
 celery.conf.beat_schedule = {
-  "check-slas-every-minute": {
+  "check-slas-hourly": {
     "task": "app.core.tasks.check_sla_breaches", # The function name
     "schedule": crontab(minute=0), # Run every 60 minutes
   }
