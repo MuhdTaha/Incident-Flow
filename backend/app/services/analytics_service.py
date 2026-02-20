@@ -21,40 +21,47 @@ class AnalyticsService:
     
     # 3. Process User Table Stats
     # The repo returns a list of tuples: (UserObj, incident_count)
-    raw_users = self.user_repo.get_user_stats(org_id)
-    formatted_users = []
-    for user, count in raw_users:
-      formatted_users.append(schemas.UserStats(
-        id=user.id,
-        full_name=user.full_name,
-        email=user.email,
-        role=user.role,
-        created_at=user.created_at,
-        incident_count=count,
-        organization_id=user.organization_id
-      ))
+    raw_users = self.analytics_repo.get_detailed_user_stats(org_id)
+    formatted_users = [
+      schemas.DetailedUserStats(
+        id=row.id,
+        full_name=row.full_name,
+        email=row.email,
+        role=row.role,
+        assigned_count=row.assigned_incidents,
+        resolved_count=row.resolved_incidents,
+        comments_made=row.comments_made,
+        breached_incidents=row.breached_incidents,
+        escalations_triggered=row.escalations_triggered   
+      ) for row in raw_users
+    ]
         
     return schemas.AdminDashboardStats(
       total_users=total_users,
       total_incidents=total_incidents,
       active_incidents=active_incidents,
       incidents_by_severity=sev_dict,
-      users=formatted_users
+      user_performance=formatted_users
     )
 
-  def get_analytics_charts(self, org_id: UUID) -> schemas.AnalyticsResponse:
-    # 1. Calculate MTTR
-    avg_seconds = self.analytics_repo.calculate_mttr_seconds(org_id)
-    avg_hours = round(avg_seconds / 3600, 1)
+  def get_analytics_charts(self, org_id: UUID, days: int = 30) -> schemas.AnalyticsResponse:
+    # 1. Dynamic Time Window Calculations
+    mttr_sec = self.analytics_repo.calculate_mttr_seconds(org_id, days)
+    mtta_sec = self.analytics_repo.calculate_mtta_seconds(org_id, days)
+    sla_data = self.analytics_repo.calculate_sla_breach_rate(org_id, days)
     
     # 2. Get Volume Trend
-    trend_data = self.analytics_repo.get_volume_trend(org_id)
+    trend_data = self.analytics_repo.get_volume_trend(org_id, days)
     formatted_trend = [
       schemas.VolumeTrendPoint(date=str(day), count=count) 
       for day, count in trend_data
     ]
     
     return schemas.AnalyticsResponse(
-      mttr_hours=avg_hours,
+      time_window_days=days,
+      mttr_hours=round(mttr_sec / 3600, 2), # Convert seconds to hours
+      mtta_minutes=round(mtta_sec / 60, 2),  # Convert seconds to minutes
+      sla_breach_rate=sla_data['breach_rate'],
+      total_breaches=sla_data['breached'],
       volume_trend=formatted_trend
     )
