@@ -19,7 +19,7 @@ help: ## Show this help message
 up: ## Start the entire stack
 	$(DC) up
 
-up b: ## Start stack in build mode (rebuilds images)
+up-b: ## Start stack in build mode (rebuilds images)
 	$(DC) up --build
 
 down: ## Stop and remove all containers

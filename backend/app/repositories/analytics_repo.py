@@ -133,7 +133,7 @@ class AnalyticsRepository:
       LEFT JOIN incident_events ie ON u.id = ie.actor_id
       WHERE u.organization_id = :org_id
       AND u.role != 'BOT'
-      GROUP BY u.id
+      GROUP BY u.id, u.full_name, u.email, u.role
     """)
     return self.db.execute(query, {"org_id": str(org_id)}).fetchall()
   
