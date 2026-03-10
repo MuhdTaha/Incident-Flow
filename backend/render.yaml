@@ -1,15 +1,16 @@
 services:
-  # 1. The Redis Message Broker
+  # 1. Free Redis Instance (For caching or future worker use)
   - type: redis
     name: incidentflow-redis
-    ipAllowList: [] # Ensure that it is secure/internal only
+    ipAllowList: [] 
     plan: free
 
-  # 2. The FastAPI Backend
+  # 2. Free FastAPI Web Service
   - type: web
     name: incidentflow-api
     env: python
     region: ohio
+    plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
@@ -27,36 +28,4 @@ services:
       - key: MAILJET_API_SECRET
         sync: false
       - key: MAILJET_SENDER_EMAIL
-        sync: false
-
-  # 3. The Celery Worker (Does the heavy lifting)
-  - type: worker
-    name: incidentflow-celery-worker
-    env: python
-    region: ohio
-    buildCommand: pip install -r requirements.txt
-    startCommand: celery -A app.core.celery_app worker --loglevel=info
-    envVars:
-      - key: CELERY_BROKER_URL
-        fromService:
-          type: redis
-          name: incidentflow-redis
-          property: connectionString
-      - key: DATABASE_URL
-        sync: false
-
-  # 4. The Celery Beat Scheduler (Triggers the SLA checks)
-  - type: worker
-    name: incidentflow-celery-beat
-    env: python
-    region: ohio
-    buildCommand: pip install -r requirements.txt
-    startCommand: celery -A app.core.celery_app beat --loglevel=info
-    envVars:
-      - key: CELERY_BROKER_URL
-        fromService:
-          type: redis
-          name: incidentflow-redis
-          property: connectionString
-      - key: DATABASE_URL
         sync: false
