@@ -6,9 +6,8 @@ const isServer = typeof window === 'undefined';
 // 2. Select the correct Base URL
 // - Server: Talk directly to the "backend" container (internal Docker DNS)
 // - Client: Talk to "localhost" (your browser's network)
-const API_URL = isServer
-  ? process.env.INTERNAL_API_URL || "http://backend:8000/api/v1"
-  : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 
+  (isServer ? "http://backend:3000" : "http://localhost:3000");
 
 export { API_URL };
 
