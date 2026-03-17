@@ -40,6 +40,7 @@ import { getSevStyles, getStatusIcon } from "@/lib/incident-utils";
 import { useAuth } from "@/context/AuthContext";
 import { useUserDirectory } from "@/context/UserContext";
 import { authFetch } from "@/lib/api";
+import { useLiveIncidents } from "@/hooks/useLiveIncidents";
 
 type Incident = {
   id: string;
@@ -107,6 +108,8 @@ export default function IncidentDashboard() {
       fetchIncidents();
     }
   }, [user]);
+
+  useLiveIncidents(setIncidents);
 
   const selectedIncident = incidents.find(i => i.id === selectedIncidentId);
   const filteredIncidents = useMemo(() => {

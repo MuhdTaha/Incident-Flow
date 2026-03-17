@@ -26,6 +26,7 @@ import {
 
 import { authFetch } from "@/lib/api";
 import AttachmentManager from "./AttachmentManager";
+import IncidentCommentThread from "./IncidentCommentThread";
 import { useUserDirectory } from "@/context/UserContext";
 
 type Event = {
@@ -265,6 +266,14 @@ export default function IncidentHistory({ incidentId, incidentTitle, incidentDes
                         <div className="text-sm text-slate-500 italic py-4">No history events found.</div>
                       )}
                     </div>
+                  )}
+
+                  {/* Real-time comment input with broadcast typing indicator */}
+                  {incidentId && (
+                    <IncidentCommentThread
+                      incidentId={incidentId}
+                      onCommentAdded={fetchEvents}
+                    />
                   )}
                 </TabsContent>
 
