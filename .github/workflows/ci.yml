@@ -70,6 +70,9 @@ jobs:
           npx playwright install --with-deps
       
       - name: Run Frontend Unit Tests (Jest)
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY }}
         run: |
           cd frontend
           npm run test:unit
