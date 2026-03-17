@@ -104,10 +104,10 @@ export default function IncidentDashboard() {
   };
 
   useEffect(() => {
-    if (user) {
+    if (user?.id) {
       fetchIncidents();
     }
-  }, [user]);
+  }, [user?.id]);
 
   useLiveIncidents(setIncidents);
 
