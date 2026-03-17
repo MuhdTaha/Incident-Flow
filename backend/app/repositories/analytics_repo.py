@@ -10,7 +10,7 @@ class AnalyticsRepository:
 
   def get_total_users(self, org_id: UUID) -> int:
     return self.db.query(models.User).filter(
-      models.User.role != "BOT", 
+      models.User.role != models.UserRole.BOT, 
       models.User.organization_id == org_id
     ).count()
 

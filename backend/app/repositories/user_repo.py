@@ -3,6 +3,7 @@ from sqlalchemy import func
 from uuid import UUID
 from typing import List, Optional
 from app.db.models import User, Incident, IncidentEvent, Organization
+from backend.app.db import models
 
 class UserRepository:
   def __init__(self, db: Session):
@@ -24,7 +25,7 @@ class UserRepository:
   def list_all(self, org_id: UUID) -> List[User]:
     return self.db.query(User).filter(
       User.organization_id == org_id,
-      User.role != "BOT"
+      User.role != models.UserRole.BOT
     ).all()
 
   def update(self, user: User) -> User:
@@ -49,7 +50,7 @@ class UserRepository:
       User,
       func.count(Incident.id).label("incident_count")
     ).filter(
-      User.role != "BOT", 
+      User.role != models.UserRole.BOT, 
       User.organization_id == org_id
     ).outerjoin(
       Incident, 
