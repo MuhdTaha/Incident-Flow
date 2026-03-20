@@ -145,7 +145,9 @@ export default function IncidentDashboard() {
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8 bg-slate-50/50 min-h-screen">
       {/* Header Section */}
-      <AppHeader />
+      <div className="print:hidden">
+        <AppHeader />
+      </div>
       
       {/* Summary Stat Cards */}
       <IncidentStats incidents={incidents} />

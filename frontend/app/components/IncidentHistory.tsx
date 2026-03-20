@@ -28,6 +28,7 @@ import { authFetch } from "@/lib/api";
 import AttachmentManager from "./AttachmentManager";
 import IncidentCommentThread from "./IncidentCommentThread";
 import { useUserDirectory } from "@/context/UserContext";
+import PostMortemViewer from "./PostMortemViewer";
 
 type Event = {
   id: string;
@@ -167,7 +168,7 @@ export default function IncidentHistory({ incidentId, incidentTitle, incidentDes
         </div>
 
         {/* Tabs Section */}
-        <div className="p-6 pt-2">
+        <div className="px-6 pt-4 pb-0">
             <Tabs defaultValue="timeline" className="w-full">
                 <TabsList className="grid w-full grid-cols-2 mb-6">
                     <TabsTrigger value="timeline" className="gap-2">
@@ -183,7 +184,7 @@ export default function IncidentHistory({ incidentId, incidentTitle, incidentDes
                   {loading ? (
                     <div className="flex justify-center py-10 text-slate-400">Loading history...</div>
                   ) : (
-                    <div className="relative pl-6 border-l-2 border-slate-100 space-y-8 ml-2 pb-10">
+                    <div className="relative pl-6 border-l-2 border-slate-100 space-y-6 ml-2 pb-2">
                       {events.map((event) => {
                         const style = getEventStyles(event.event_type);
                         const Icon = style.icon;
@@ -270,10 +271,12 @@ export default function IncidentHistory({ incidentId, incidentTitle, incidentDes
 
                   {/* Real-time comment input with broadcast typing indicator */}
                   {incidentId && (
-                    <IncidentCommentThread
-                      incidentId={incidentId}
-                      onCommentAdded={fetchEvents}
-                    />
+                    <div className="mt-0 pt-0 border-t border-slate-100">
+                      <IncidentCommentThread
+                        incidentId={incidentId}
+                        onCommentAdded={fetchEvents}
+                      />
+                    </div>
                   )}
                 </TabsContent>
 
@@ -283,6 +286,17 @@ export default function IncidentHistory({ incidentId, incidentTitle, incidentDes
                 </TabsContent>
             </Tabs>
         </div>
+
+        {/* Drop the Post-Mortem Viewer at the bottom */}
+        {incidentId && (
+          <div className="px-6 pb-6">
+            <PostMortemViewer 
+              incidentId={incidentId} 
+              status={incidentStatus ?? ""} 
+            />
+          </div>
+        )}
+                
       </SheetContent>
     </Sheet>
   );
