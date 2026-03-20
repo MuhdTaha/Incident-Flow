@@ -62,3 +62,4 @@ mailjet-rest==1.5.1
 alembic==1.18.3
 MarkupSafe==3.0.3
 supabase==2.6.0
+groq==1.1.1
