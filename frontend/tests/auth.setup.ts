@@ -1,18 +1,47 @@
 import { test as setup, expect } from '@playwright/test';
+import { createClient } from '@supabase/supabase-js';
 
 const authFile = 'playwright/.auth/user.json';
 
-setup('authenticate', async ({ page }) => {
-  await page.goto('/login');
-  
-  await page.getByLabel('Email').fill('mohd.taha75@gmail.com');
-  await page.getByLabel('Password').fill('abcd1234');
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(
+      `Missing ${name}. Add it to frontend/.env locally or configure it as a GitHub Actions secret in CI.`,
+    );
+  }
+  return value;
+}
 
-  await page.getByRole('button', { name: /login|submit|sign in/i }).click();
+setup('authenticate', async ({ page, context }) => {
+  const supabaseUrl = requireEnv('NEXT_PUBLIC_SUPABASE_URL');
+  const supabaseKey = requireEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY');
+  const email = requireEnv('E2E_USER_EMAIL');
+  const password = requireEnv('E2E_USER_PASSWORD');
 
-  // Wait for the dashboard to load to ensure login finished
-  await expect(page).toHaveURL('/');
+  const supabase = createClient(supabaseUrl, supabaseKey);
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
-  // End-to-end reliability: Save the signed-in state
-  await page.context().storageState({ path: authFile });
+  if (error) {
+    throw new Error(`E2E sign-in failed: ${error.message}`);
+  }
+  if (!data.session) {
+    throw new Error('E2E sign-in succeeded but returned no session');
+  }
+
+  const projectRef = new URL(supabaseUrl).hostname.split('.')[0];
+  const storageKey = `sb-${projectRef}-auth-token`;
+
+  await context.addInitScript(
+    ({ storageKey, session }) => {
+      localStorage.setItem(storageKey, JSON.stringify(session));
+    },
+    { storageKey, session: data.session },
+  );
+
+  await page.goto('/');
+  await expect(page).toHaveURL('/', { timeout: 15_000 });
+  await expect(page.getByText('IncidentFlow')).toBeVisible({ timeout: 15_000 });
+
+  await context.storageState({ path: authFile });
 });
