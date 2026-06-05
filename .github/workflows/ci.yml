@@ -84,7 +84,18 @@ jobs:
           E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
           E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
         run: |
+          if [ -z "$E2E_USER_EMAIL" ] || [ -z "$E2E_USER_PASSWORD" ]; then
+            echo "::error::Missing E2E secrets. Add E2E_USER_EMAIL and E2E_USER_PASSWORD under Settings → Secrets and variables → Actions."
+            exit 1
+          fi
           cd frontend
+          # Playwright workers load frontend/.env via dotenv; write it in CI (no committed .env).
+          printf '%s\n' \
+            "NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL" \
+            "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY" \
+            "E2E_USER_EMAIL=$E2E_USER_EMAIL" \
+            "E2E_USER_PASSWORD=$E2E_USER_PASSWORD" \
+            > .env
           npm run test:e2e
 
       - name: Run Build

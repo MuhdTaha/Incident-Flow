@@ -1,5 +1,10 @@
 import { test as setup, expect } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+import path from 'path';
+
+// Workers load this file in a separate process; ensure frontend/.env is applied in CI too.
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const authFile = 'playwright/.auth/user.json';
 

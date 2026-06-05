@@ -30,6 +30,8 @@ export default defineConfig({
       NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY:
         process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ?? '',
+      E2E_USER_EMAIL: process.env.E2E_USER_EMAIL ?? '',
+      E2E_USER_PASSWORD: process.env.E2E_USER_PASSWORD ?? '',
     },
   },
   use: {
