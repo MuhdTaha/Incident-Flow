@@ -15,18 +15,21 @@ from app.core.fsm import can_transition, IncidentStatus
 class IncidentService:
   def __init__(self, db: Session):
     self.repo = IncidentRepository(db)
-    # We keep db reference just in case we need cross-repo access (e.g. Users)
-    self.db = db 
+    self.db = db
+
+  def _commit(self):
+    self.db.commit()
+
+  def list_incidents(self, org_id: UUID) -> List[models.Incident]:
+    return self.repo.get_all(org_id)
 
   def create_incident(self, data: schemas.IncidentCreate, user: models.User, org_id: UUID) -> models.Incident:
-    # 1. RBAC Logic: Only Admins/Managers can assign to others
     final_owner_id = user.id
     if data.owner_id and data.owner_id != user.id:
       if user.role not in ["ADMIN", "MANAGER"]:
         raise HTTPException(status_code=403, detail="Not authorized to assign incidents to others")
       final_owner_id = data.owner_id
-    
-    # 2. Prepare Data
+
     new_incident = models.Incident(
       title=data.title,
       description=data.description,
@@ -35,24 +38,22 @@ class IncidentService:
       status=IncidentStatus.DETECTED,
       organization_id=org_id
     )
-    
-    # 3. Save to DB
-    created = self.repo.create(new_incident)
-    
-    # 4. Create Audit Log (Creation Event)
+
+    created = self.repo.add(new_incident)
+
     audit = models.IncidentEvent(
       incident_id=created.id,
       actor_id=user.id,
       organization_id=org_id,
       event_type="CREATION",
       new_value=IncidentStatus.DETECTED,
-      comment=f"Incident declared by {user.full_name}" + 
-          (f" (Assigned to {final_owner_id})" if final_owner_id != user.id else "")
+      comment=f"Incident declared by {user.full_name}"
+      + (f" (Assigned to {final_owner_id})" if final_owner_id != user.id else "")
     )
     self.repo.add_event(audit)
-    
-    # 5. Trigger Async Email
-    # (We query the owner email quickly here to send the alert)
+    self._commit()
+    self.repo.refresh(created)
+
     owner_email = self.db.query(models.User.email).filter(models.User.id == final_owner_id).scalar()
     if owner_email:
       send_incident_alert_email.delay(
@@ -61,33 +62,29 @@ class IncidentService:
         incident_id=str(created.id),
         severity=str(created.severity)
       )
-      
+
     return created
 
   def transition_incident(self, incident_id: UUID, data: schemas.TransitionRequest, user: models.User, org_id: UUID):
-    # 1. Fetch
     incident = self.repo.get_by_id(incident_id, org_id)
     if not incident:
       raise HTTPException(status_code=404, detail="Incident not found")
 
-    # 2. Validate FSM Transition
     if not can_transition(incident.status, data.new_state):
       raise HTTPException(status_code=400, detail=f"Invalid transition from {incident.status} to {data.new_state}")
 
-    # 3. Update State & Timestamps
     old_state = incident.status
     incident.status = data.new_state
-    
+
     if data.new_state in [IncidentStatus.RESOLVED, IncidentStatus.CLOSED]:
       if not incident.resolved_at:
         incident.resolved_at = datetime.utcnow()
     elif data.new_state == IncidentStatus.INVESTIGATING:
-      # If reopened, clear the resolution timestamp
       incident.resolved_at = None
 
-    updated = self.repo.update(incident)
+    self.repo.flush()
+    self.repo.refresh(incident)
 
-    # 4. Audit Log
     audit = models.IncidentEvent(
       incident_id=incident.id,
       actor_id=user.id,
@@ -98,66 +95,62 @@ class IncidentService:
       comment=data.comment or f"State changed from {old_state} to {data.new_state}"
     )
     self.repo.add_event(audit)
-    
-    return updated
-  
+    self._commit()
+    return incident
+
   def update_incident(self, incident_id: UUID, data: schemas.IncidentUpdate, user: models.User, org_id: UUID):
     incident = self.repo.get_by_id(incident_id, org_id)
     if not incident:
       raise HTTPException(status_code=404, detail="Incident not found")
-    
+
     changes = []
-    
-    # Check for severity change
+
     if data.severity and data.severity != incident.severity:
       old_severity = incident.severity.value if hasattr(incident.severity, "value") else str(incident.severity)
       changes.append(("SEVERITY_CHANGE", old_severity, data.severity.value))
       incident.severity = data.severity
-      
-    # Check for owner change
+
     if data.owner_id and data.owner_id != incident.owner_id:
-      # RBAC Check
       if user.role not in ["ADMIN", "MANAGER"]:
         raise HTTPException(status_code=403, detail="Not authorized to reassign incidents")
       changes.append(("OWNER_CHANGE", str(incident.owner_id), str(data.owner_id)))
       incident.owner_id = data.owner_id
-      
-    updated = self.repo.update(incident)
-    
-    # Audit Logs for each change
+
+    self.repo.flush()
+    self.repo.refresh(incident)
+
     for event_type, old_val, new_val in changes:
       audit = models.IncidentEvent(
         incident_id=incident.id,
         actor_id=user.id,
         organization_id=org_id,
-        event_type=event_type, # e.g., "SEVERITY_CHANGE"
+        event_type=event_type,
         old_value=old_val,
         new_value=new_val,
-        # Use the comment provided in the request, or generate a system one
         comment=data.comment or f"{event_type} from {old_val} to {new_val}"
       )
-
       self.repo.add_event(audit)
-      
-    return updated
-  
+
+    self._commit()
+    return incident
+
   def delete_incident(self, incident_id: UUID, user: models.User, org_id: UUID):
     incident = self.repo.get_by_id(incident_id, org_id)
     if not incident:
       raise HTTPException(status_code=404, detail="Incident not found")
-   
-    # RBAC Check
+
     if user.role not in ["ADMIN", "MANAGER"]:
-      raise HTTPException(status_code=403, detail="Not authorized to delete incidents") 
-    self.repo.delete(incident)
-  
+      raise HTTPException(status_code=403, detail="Not authorized to delete incidents")
+
+    self.repo.delete_entity(incident)
+    self._commit()
     return {"message": "Incident deleted successfully"}
 
   def add_comment(self, incident_id: UUID, data: schemas.CommentRequest, user: models.User, org_id: UUID):
     incident = self.repo.get_by_id(incident_id, org_id)
     if not incident:
       raise HTTPException(status_code=404, detail="Incident not found")
-        
+
     audit = models.IncidentEvent(
       incident_id=incident.id,
       actor_id=user.id,
@@ -166,11 +159,12 @@ class IncidentService:
       comment=data.comment
     )
     self.repo.add_event(audit)
+    self._commit()
     return {"message": "Comment added"}
-  
+
   def get_incident_events(self, incident_id: UUID, org_id: UUID) -> List[models.IncidentEvent]:
     incident = self.repo.get_by_id(incident_id, org_id)
     if not incident:
       raise HTTPException(status_code=404, detail="Incident not found")
-    
-    return self.repo.get_events(incident_id)
+
+    return self.repo.get_events(incident_id, org_id)

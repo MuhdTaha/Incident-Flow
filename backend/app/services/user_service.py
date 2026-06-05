@@ -7,7 +7,11 @@ from app.repositories.user_repo import UserRepository
 class UserService:
   def __init__(self, db: Session):
     self.repo = UserRepository(db)
-    
+    self.db = db
+
+  def _commit(self):
+    self.db.commit()
+
   def list_users(self, org_id: UUID):
     return self.repo.list_all(org_id)
 
@@ -16,20 +20,22 @@ class UserService:
     if not user:
       raise HTTPException(status_code=404, detail="User not found")
 
-    # Business Rule: Admins cannot demote/change themselves
     if user.id == current_user_id:
       raise HTTPException(status_code=400, detail="Admins cannot change their own role")
-    
+
     user.role = role_update.role
-    return self.repo.update(user)
+    self.repo.flush()
+    self.repo.refresh(user)
+    self._commit()
+    return user
 
   def delete_user(self, user_id: UUID, current_user_id: UUID, org_id: UUID):
-    # Business Rule: Admins cannot delete themselves
     if user_id == current_user_id:
       raise HTTPException(status_code=400, detail="Admins cannot delete their own account")
-    
+
     user = self.repo.get_by_id(user_id, org_id)
     if not user:
       raise HTTPException(status_code=404, detail="User not found")
-    
-    self.repo.delete(user)
+
+    self.repo.delete_entity(user)
+    self._commit()

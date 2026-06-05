@@ -1,5 +1,4 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 from uuid import UUID
 from typing import List, Optional
 from app.db.models import Incident, IncidentEvent, IncidentAttachment
@@ -19,37 +18,38 @@ class IncidentRepository:
       Incident.organization_id == org_id
     ).all()
 
-  def create(self, incident: Incident) -> Incident:
+  def add(self, incident: Incident) -> Incident:
     self.db.add(incident)
-    self.db.commit()
+    self.db.flush()
     self.db.refresh(incident)
     return incident
 
-  def update(self, incident: Incident) -> Incident:
-    self.db.add(incident)
-    self.db.commit()
+  def flush(self):
+    self.db.flush()
+
+  def refresh(self, incident: Incident) -> Incident:
     self.db.refresh(incident)
     return incident
-  
-  def delete(self, incident: Incident):
+
+  def delete_entity(self, incident: Incident):
     self.db.delete(incident)
-    self.db.commit()
-    
+
   # --- Events (Audit Log) ---
 
   def add_event(self, event: IncidentEvent):
     self.db.add(event)
-    self.db.commit()
-  
-  def get_events(self, incident_id: UUID) -> List[IncidentEvent]:
+    self.db.flush()
+
+  def get_events(self, incident_id: UUID, org_id: UUID) -> List[IncidentEvent]:
     return self.db.query(IncidentEvent).filter(
-      IncidentEvent.incident_id == incident_id
+      IncidentEvent.incident_id == incident_id,
+      IncidentEvent.organization_id == org_id
     ).order_by(IncidentEvent.created_at.desc()).all()
-  
+
   # --- Attachments ---
-  def add_attachment(self, attachment: IncidentAttachment):
+  def add_attachment(self, attachment: IncidentAttachment) -> IncidentAttachment:
     self.db.add(attachment)
-    self.db.commit()
+    self.db.flush()
     self.db.refresh(attachment)
     return attachment
 
@@ -60,11 +60,11 @@ class IncidentRepository:
       IncidentAttachment.organization_id == org_id
     ).first()
 
-  def get_attachments_for_incident(self, incident_id: UUID) -> List[IncidentAttachment]:
-    return self.db.query(IncidentAttachment)\
-      .filter(IncidentAttachment.incident_id == incident_id)\
-      .all()
-  
+  def get_attachments_for_incident(self, incident_id: UUID, org_id: UUID) -> List[IncidentAttachment]:
+    return self.db.query(IncidentAttachment).filter(
+      IncidentAttachment.incident_id == incident_id,
+      IncidentAttachment.organization_id == org_id
+    ).all()
+
   def delete_attachment(self, attachment: IncidentAttachment):
     self.db.delete(attachment)
-    self.db.commit()

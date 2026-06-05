@@ -193,3 +193,27 @@ def test_tenant_isolation(client, db, incident_id):
   assert not any(i["id"] == incident_id for i in incidents)
 
   del app.dependency_overrides[get_current_user]
+
+def test_postmortem_tenant_isolation(client, db, incident_id):
+  """Post-mortem endpoints must not expose incidents from other organizations."""
+  competitor_org = Organization(id=uuid.uuid4(), name="Competitor Corp", slug="comp-corp-2")
+  db.add(competitor_org)
+  competitor_user = User(
+    id=uuid.uuid4(),
+    email="spy2@competitor.com",
+    full_name="Corporate Spy",
+    role=UserRole.ADMIN,
+    organization_id=competitor_org.id
+  )
+  db.add(competitor_user)
+  db.commit()
+
+  app.dependency_overrides[get_current_user] = lambda: competitor_user
+
+  get_response = client.get(f"/api/v1/incidents/{incident_id}/postmortem")
+  assert get_response.status_code == 404
+
+  post_response = client.post(f"/api/v1/incidents/{incident_id}/postmortem")
+  assert post_response.status_code == 404
+
+  del app.dependency_overrides[get_current_user]
