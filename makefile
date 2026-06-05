@@ -35,11 +35,11 @@ logs: ## Follow logs for all containers
 
 test: test-backend test-frontend ## Run all unit tests (Backend + Frontend)
 
-test-backend: ## Run Python backend tests (Pytest)
-	$(DC) exec backend pytest
+test-backend: ## Run Python backend tests (Pytest; starts backend container if needed)
+	$(DC) run --rm backend pytest
 
-test-frontend: ## Run Frontend unit tests (Jest)
-	$(DC) exec frontend npm run test:unit
+test-frontend: ## Run Frontend unit tests (Jest; runs on host, no stack required)
+	cd frontend && npm run test:unit
 
 test-e2e: ## Run Playwright E2E tests (Runs locally against Docker)
 	cd frontend && npx playwright test
