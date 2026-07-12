@@ -24,7 +24,13 @@ celery.conf.update(
 # Beat Schedule
 celery.conf.beat_schedule = {
   "check-slas-hourly": {
-    "task": "app.core.tasks.check_sla_breaches", # The function name
-    "schedule": crontab(minute=0), # Run every 60 minutes
-  }
+    "task": "app.core.tasks.check_sla_breaches",
+    "schedule": crontab(minute=0),  # every hour
+  },
+  "refresh-demo-data": {
+    "task": "app.core.tasks.refresh_demo_data",
+    # Every 2 hours — keeps audit timelines fresh for portfolio demos
+    "schedule": crontab(minute=15, hour="*/2"),
+    "kwargs": {"actions": 4},
+  },
 }

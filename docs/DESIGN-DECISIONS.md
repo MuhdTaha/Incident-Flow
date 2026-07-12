@@ -58,15 +58,25 @@ Key technical choices and trade-offs. Useful for portfolio reviewers evaluating 
 
 ## 7. Celery for async work
 
-**Decision:** Email alerts and SLA checks run in background workers, not in request handlers.
+**Decision:** Email alerts, SLA checks, and demo data refresh run in background workers, not in request handlers.
 
-**Why:** API latency stays predictable. Beat scheduler can poll for SLA breaches without blocking users.
+**Why:** API latency stays predictable. Beat scheduler can poll for SLA breaches and keep demo timelines fresh without blocking users.
 
-**Local dev:** Mailhog captures outbound email; Redis ships in Docker Compose.
+**Local dev:** Mailhog captures outbound email; Redis ships in Docker Compose. Worker + beat run as Compose services.
 
 ---
 
-## 8. AI post-mortems as a separate service
+## 8. Demo seed + scheduled refresh
+
+**Decision:** A dedicated `DemoSeedService` (not ad-hoc SQL in Docker init) owns portfolio demo data. Celery Beat refreshes every 2 hours; GitHub Actions cron every 6 hours as a backup when free-tier workers sleep.
+
+**Why:** Local Docker volumes and deployed Supabase diverge easily. Idempotent seed by incident title keeps both environments demo-ready without wiping real user work. Refresh only mutates catalog / `Live Demo:` rows and respects the FSM.
+
+**Where:** `app/services/demo_seed_service.py`, `scripts/seed_demo.py`, Beat entry in `app/core/celery_app.py`, workflow `.github/workflows/demo-seed.yml`.
+
+---
+
+## 9. AI post-mortems as a separate service
 
 **Decision:** `PostMortemService` verifies org access, loads incident + events, then calls Groq. Output saved to org-scoped S3 keys.
 
@@ -80,5 +90,6 @@ Key technical choices and trade-offs. Useful for portfolio reviewers evaluating 
 - No real-time websocket updates (polling / refresh on navigation)
 - Invite flow requires Supabase service role key
 - E2E tests need a pre-provisioned Supabase test user
+- Demo seed targets one org (`DEMO_ORG_ID`); users in other orgs will not see the catalog
 
 These are documented intentionally — they show awareness of production gaps without over-scoping the capstone.

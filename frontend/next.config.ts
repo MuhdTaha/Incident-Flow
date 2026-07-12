@@ -5,8 +5,9 @@ import { fileURLToPath } from "url";
 const frontendDir = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
-  // Monorepo has a root package-lock.json; pin tracing/turbopack to frontend.
-  outputFileTracingRoot: path.join(frontendDir, ".."),
+  // Pin to the frontend app dir (not ".."). In Docker WORKDIR is /app, so
+  // parent would be / and Tailwind/Next resolve modules from the wrong root.
+  outputFileTracingRoot: frontendDir,
   turbopack: {
     root: frontendDir,
   },

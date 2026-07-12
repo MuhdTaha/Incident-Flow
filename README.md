@@ -9,7 +9,8 @@ Multi-tenant incident management platform for engineering teams. Track productio
 - **Finite state machine** for incident status (no invalid transitions)
 - **Organization-scoped multi-tenancy** on every data access path
 - **Immutable audit log** for every status change, assignment, and comment
-- **Background workers** (Celery) for SLA checks and email alerts
+- **Background workers** (Celery) for SLA checks, email alerts, and demo data refresh
+- **Demo seed** so local and deployed dashboards always have realistic incidents/timelines
 - **Direct-to-storage uploads** (MinIO/S3) for attachments and post-mortems
 - **AI post-mortems** via Groq, persisted to object storage
 
@@ -34,18 +35,20 @@ cp backend/.env.example backend/.env   # fill in Supabase + optional keys
 cp frontend/.env.example frontend/.env
 make up
 make migrate
+make seed          # demo incidents + audit timelines
 ```
 
 Open **http://localhost:3000**. API docs: **http://localhost:8000/docs**.
 
-See [docs/SETUP.md](docs/SETUP.md) for full environment and service details.
+See [docs/SETUP.md](docs/SETUP.md) for environment vars, demo seeding, and deploy notes.
 
 ## Documentation
 
 | Doc | Purpose |
 |-----|---------|
 | [PRD.md](docs/PRD.md) | Product requirements, personas, features, success criteria |
-| [SETUP.md](docs/SETUP.md) | Local install, env vars, Docker services, testing |
+| [IMPROVEMENTS.md](docs/IMPROVEMENTS.md) | Prioritized fixes and features for portfolio / demo readiness |
+| [SETUP.md](docs/SETUP.md) | Local install, demo seed/refresh, env vars, deploy notes, testing |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System diagram, layers, data flow, tenancy model |
 | [API.md](docs/API.md) | REST endpoint reference and auth |
 | [DESIGN-DECISIONS.md](docs/DESIGN-DECISIONS.md) | Why key technical choices were made |
@@ -56,6 +59,8 @@ See [docs/SETUP.md](docs/SETUP.md) for full environment and service details.
 make help           # all commands
 make up             # start stack
 make migrate        # run Alembic migrations
+make seed           # seed demo incidents + audit timelines
+make seed-refresh   # seed + append fresh demo activity
 make test-backend   # pytest
 make test-frontend  # Jest
 make test-e2e       # Playwright
@@ -66,12 +71,11 @@ make test-e2e       # Playwright
 ```
 incidentflow/
 ├── backend/          # FastAPI API, services, repositories, Celery tasks
+│   ├── scripts/      # Demo seed CLI (python -m scripts.seed_demo)
+│   └── render.yaml   # Render: API + Redis + worker + beat
 ├── frontend/         # Next.js app (dashboard, admin, post-mortem)
 ├── docs/             # Architecture, setup, API, design notes
+├── .github/workflows # CI + scheduled demo-seed refresh
 ├── docker-compose.yml
 └── makefile
 ```
-
-## License
-
-MIT (or update as needed)

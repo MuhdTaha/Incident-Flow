@@ -28,6 +28,7 @@ cp frontend/.env.example frontend/.env
 | `GROQ_API_KEY` | For AI post-mortems | Groq API key |
 | `MAILJET_*` | Optional | Production email alerts (Mailhog used locally) |
 | `S3_*` | Optional | Defaults work with bundled MinIO |
+| `DEMO_ORG_ID` | Optional | Org UUID for demo seed (defaults to Default Org `00000000-0000-0000-0000-000000000111`) |
 
 \* Tests use in-memory SQLite and do not need a real database.
 
@@ -37,13 +38,14 @@ cp frontend/.env.example frontend/.env
 |----------|-------------|
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | Supabase anon key |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:8000/api/v1` |
+| `NEXT_PUBLIC_API_URL` | Local: `http://localhost:8000/api/v1`. Deployed: your Render API URL + `/api/v1` |
 
 ## 2. Start the stack
 
 ```bash
 make up          # or: make up-b  to rebuild images
 make migrate     # apply Alembic migrations
+make seed        # populate demo incidents + audit timelines
 ```
 
 | Service | URL |
@@ -61,7 +63,67 @@ make migrate     # apply Alembic migrations
 3. Enter an organization name — backend creates org + admin user
 4. Sign in and create incidents from the dashboard
 
-## 4. Run tests
+**Portfolio demo tip:** Seed data lands in the **Default Org**. Either register into that org (or set `DEMO_ORG_ID` to your org’s UUID) so the dashboard shows the catalog after login.
+
+## 4. Demo data
+
+IncidentFlow ships an idempotent demo seeder so local and deployed environments always have a rich audit trail for walkthroughs.
+
+| Command | What it does |
+|---------|----------------|
+| `make seed` | Ensure demo personas + ~10 catalog incidents with timelines exist |
+| `make seed-refresh` | Seed, then append comments / FSM transitions; may open a `Live Demo:` incident |
+
+Equivalent CLI (from `backend/`, or inside the API container):
+
+```bash
+python -m scripts.seed_demo
+python -m scripts.seed_demo --refresh --actions 4
+python -m scripts.seed_demo --refresh --org-id <uuid>
+```
+
+**Implementation:** `backend/app/services/demo_seed_service.py`  
+**Entrypoint:** `backend/scripts/seed_demo.py`
+
+### What gets seeded
+
+- Demo users: Alex (ADMIN), Sarah (MANAGER), Jordan (ENGINEER), plus a System Bot
+- Catalog incidents across severities/statuses (e.g. gateway timeout, DB pool exhaustion, rate limits)
+- Immutable `IncidentEvent` rows (creation, status changes, comments, SLA breaches)
+- On refresh: new comments, valid FSM transitions, occasional `Live Demo:` incidents (old live rows pruned)
+
+### Keeping demos fresh automatically
+
+| Mechanism | Schedule | Notes |
+|-----------|----------|--------|
+| Celery Beat → `refresh_demo_data` | Every 2 hours | Needs Redis + `worker` + `beat` (included in Docker Compose; declared in `backend/render.yaml`) |
+| GitHub Actions `demo-seed.yml` | Every 6 hours + manual dispatch | Backup when free-tier workers sleep. Requires repo secret `DATABASE_URL` (optional `DEMO_ORG_ID`) |
+
+Seed the **deployed** database once:
+
+```bash
+# With DATABASE_URL pointing at Supabase / production Postgres:
+cd backend && python -m scripts.seed_demo --refresh --actions 4
+```
+
+Or trigger **Actions → Demo Seed Refresh → Run workflow** after the secret is set.
+
+## 5. Deploy notes (Render + GitHub)
+
+`backend/render.yaml` defines:
+
+| Service | Role |
+|---------|------|
+| `incidentflow-api` | FastAPI |
+| `incidentflow-redis` | Celery broker |
+| `incidentflow-worker` | Runs tasks (email, SLA, demo refresh) |
+| `incidentflow-beat` | Schedules SLA + demo refresh |
+
+Set the same `DATABASE_URL` (and optional `DEMO_ORG_ID`) on API, worker, and beat.
+
+For the GitHub cron backup: **Settings → Secrets → Actions** → add `DATABASE_URL` matching the Render/Supabase database.
+
+## 6. Run tests
 
 ```bash
 make test-backend    # Pytest in Docker
@@ -69,13 +131,15 @@ make test-frontend   # Jest (host)
 make test-e2e        # Playwright — set E2E_USER_* in frontend/.env
 ```
 
-## 5. Useful commands
+## 7. Useful commands
 
 ```bash
 make logs            # follow all container logs
 make db-shell        # psql into local Postgres
 make shell-backend   # bash in API container
 make migration msg="add_field"   # new Alembic revision
+make seed            # seed demo incidents + audit timelines
+make seed-refresh    # seed + append fresh comments/transitions
 make down            # stop containers
 make clean           # stop + remove volumes (wipes DB)
 ```
@@ -85,6 +149,9 @@ make clean           # stop + remove volumes (wipes DB)
 | Issue | Fix |
 |-------|-----|
 | 401 on API calls | Check `SUPABASE_JWT_SECRET` matches Supabase project |
-| Frontend can't reach API | Confirm `NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1` |
+| Frontend can't reach API | Confirm `NEXT_PUBLIC_API_URL` points at the API (`…/api/v1`) |
 | Migrations fail | Run `make up` first; ensure `db` container is healthy |
 | Post-mortem 503 | Set `GROQ_API_KEY` in `backend/.env` |
+| Dashboard empty after seed | Confirm your user is in `DEMO_ORG_ID` / Default Org |
+| Deployed dashboard empty | Run `python -m scripts.seed_demo --refresh` against deployed `DATABASE_URL`, or trigger **Demo Seed Refresh** |
+| Demo refresh not running on Render | Ensure worker + beat are deployed and share Redis/`DATABASE_URL`; or rely on the GitHub Actions cron |

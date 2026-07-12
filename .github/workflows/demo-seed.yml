@@ -1,0 +1,48 @@
+# Periodically refresh demo incidents/events on the deployed database.
+# Requires GitHub Actions secret: DATABASE_URL (same Postgres the Render API uses).
+# Optional: DEMO_ORG_ID (defaults to Default Org UUID).
+
+name: Demo Seed Refresh
+
+on:
+  schedule:
+    # Every 6 hours — backup if Render free worker/beat is asleep
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      actions:
+        description: "Number of refresh mutations"
+        required: false
+        default: "4"
+
+jobs:
+  refresh-demo:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Refresh demo data
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DEMO_ORG_ID: ${{ secrets.DEMO_ORG_ID }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::Add DATABASE_URL under Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          ACTIONS="${{ github.event.inputs.actions }}"
+          ACTIONS="${ACTIONS:-4}"
+          python -m scripts.seed_demo --refresh --actions "$ACTIONS"

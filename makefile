@@ -6,7 +6,7 @@ BACKEND_CONTAINER = incidentflow-backend
 FRONTEND_CONTAINER = incidentflow-frontend
 DB_CONTAINER = incidentflow-db
 
-.PHONY: help up down restart logs test test-backend test-frontend test-e2e migrate migration db-shell shell-backend
+.PHONY: help up down restart logs test test-backend test-frontend test-e2e migrate migration seed seed-refresh db-shell shell-backend
 
 # --- 🚀 Main Commands ---
 
@@ -52,6 +52,12 @@ migrate: ## Apply pending Alembic migrations to the DB
 migration: ## Create a new migration file. Usage: make migration msg="my_change"
 	@if [ -z "$(msg)" ]; then echo "Error: msg is required. Usage: make migration msg='description'"; exit 1; fi
 	$(DC) exec backend alembic revision --autogenerate -m "$(msg)"
+
+seed: ## Seed demo incidents + audit timelines (idempotent)
+	$(DC) exec backend python -m scripts.seed_demo
+
+seed-refresh: ## Seed demo data and append fresh comments/transitions
+	$(DC) exec backend python -m scripts.seed_demo --refresh --actions 4
 
 db-shell: ## Open a PSQL shell inside the database container
 	$(DC) exec db psql -U postgres -d incidentflow

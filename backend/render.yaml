@@ -1,8 +1,8 @@
 services:
-  # 1. Free Redis Instance (For caching or future worker use)
+  # 1. Free Redis Instance (broker for Celery)
   - type: redis
     name: incidentflow-redis
-    ipAllowList: [] 
+    ipAllowList: []
     plan: free
 
   # 2. Free FastAPI Web Service
@@ -11,6 +11,7 @@ services:
     env: python
     region: ohio
     plan: free
+    rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
@@ -28,4 +29,54 @@ services:
       - key: MAILJET_API_SECRET
         sync: false
       - key: MAILJET_SENDER_EMAIL
+        sync: false
+      - key: DEMO_ORG_ID
+        sync: false
+
+  # 3. Celery worker (emails, SLA, demo refresh tasks)
+  - type: worker
+    name: incidentflow-worker
+    env: python
+    region: ohio
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: celery -A app.core.celery_app.celery worker --loglevel=info
+    envVars:
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: redis
+          name: incidentflow-redis
+          property: connectionString
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: MAILJET_API_KEY
+        sync: false
+      - key: MAILJET_API_SECRET
+        sync: false
+      - key: MAILJET_SENDER_EMAIL
+        sync: false
+      - key: DEMO_ORG_ID
+        sync: false
+
+  # 4. Celery Beat (schedules SLA checks + demo refresh every 2h)
+  - type: worker
+    name: incidentflow-beat
+    env: python
+    region: ohio
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: celery -A app.core.celery_app.celery beat --loglevel=info
+    envVars:
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: redis
+          name: incidentflow-redis
+          property: connectionString
+      - key: DATABASE_URL
+        sync: false
+      - key: DEMO_ORG_ID
         sync: false

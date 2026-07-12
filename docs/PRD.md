@@ -191,6 +191,7 @@ Engineers cannot assign incidents to other users on create.
 - [x] Admin dashboard renders org metrics
 - [x] AI post-mortem generates and persists markdown
 - [x] Celery worker processes SLA checks and email tasks
+- [x] Demo seed + periodic refresh keep portfolio dashboards populated
 - [x] CI runs backend + frontend tests on every PR
 
 ---

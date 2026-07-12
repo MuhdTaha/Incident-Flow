@@ -16,7 +16,7 @@ High-level design of IncidentFlow for reviewers and contributors.
                     ▲               │                     │
                     │               ▼                     │
                     │         Celery Worker ◄─────────────┘
-                    │         Celery Beat (SLA checks)
+                    │         Celery Beat (SLA + demo refresh)
                     └───────────────────────────────────
 ```
 
@@ -70,10 +70,15 @@ Invalid transitions are rejected at the service layer before any DB write.
 | Task | Trigger | Worker |
 |------|---------|--------|
 | New incident email | Incident created | Celery |
-| SLA breach check | Scheduled (Beat) | Celery |
+| SLA breach check | Scheduled hourly (Beat) | Celery |
 | Auto-escalation | Incident past SLA threshold | Celery |
+| Demo data refresh | Scheduled every 2h (Beat); GitHub Actions every 6h | Celery / CI |
 
 Redis is the message broker. API requests stay fast; workers handle I/O-heavy work.
+
+### Demo seed
+
+`DemoSeedService` (`app/services/demo_seed_service.py`) idempotently seeds a catalog of incidents and audit events for `DEMO_ORG_ID` (default org). Refresh appends comments, applies valid FSM transitions, and may spawn short-lived `Live Demo:` incidents so portfolio demos never look empty. CLI: `python -m scripts.seed_demo` / `make seed`. Details: [SETUP.md](SETUP.md#4-demo-data).
 
 ## File storage
 

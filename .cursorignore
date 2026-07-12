@@ -1,0 +1,7 @@
+# Exclude build artifacts and dependencies
+node_modules/
+bin/
+obj/
+.next/
+dist/
+*.log
