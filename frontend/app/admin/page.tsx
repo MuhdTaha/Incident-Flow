@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useCurrentUser } from "@/context/UserContext";
 import { authFetch } from "@/lib/api";
 import { 
   Card, 
@@ -16,7 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Users, Activity, AlertTriangle, ShieldAlert, Settings, Eye } from "lucide-react";
+import { Users, Activity, AlertTriangle, Settings } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import EditUserModal from "../components/EditUserModal";
@@ -47,6 +48,7 @@ type DashboardStats = {
 
 export default function AdminDashboard() {
   const { user, loading: authLoading } = useAuth();
+  const { currentUser, loading: profileLoading, isAdmin } = useCurrentUser();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -56,17 +58,24 @@ export default function AdminDashboard() {
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<DetailedUserStat | null>(null);
 
-  // Protect the route
   useEffect(() => {
-    if (!authLoading) {
-      if (!user || user?.app_metadata.role !== "ADMIN") {
-        console.log("Redirecting non-admin user");
-        router.push("/");
-      } else {
-        fetchStats();
-      }
+    if (authLoading || profileLoading) return;
+
+    if (!user) {
+      router.push("/login");
+      return;
     }
-  }, [user, authLoading, router]);
+    if (!currentUser) {
+      router.push("/register");
+      return;
+    }
+    if (!isAdmin) {
+      router.push("/");
+      return;
+    }
+
+    fetchStats();
+  }, [user, currentUser, isAdmin, authLoading, profileLoading, router]);
 
   const fetchStats = async () => {
     try {
@@ -93,7 +102,10 @@ export default function AdminDashboard() {
     setIsStatsModalOpen(true);
   };
 
-  if (loading || authLoading) return <div className="p-8">Loading Admin Panel...</div>;
+  if (authLoading || profileLoading || (isAdmin && loading)) {
+    return <div className="p-8">Loading Admin Panel...</div>;
+  }
+  if (!isAdmin) return null;
   if (!stats) return <div className="p-8">Error loading stats.</div>;
 
   return (
@@ -116,7 +128,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
@@ -149,17 +161,6 @@ export default function AdminDashboard() {
             <div className="text-2xl font-bold text-red-600">
               {stats.incidents_by_severity["SEV1"] || 0}
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">System Health</CardTitle>
-            <ShieldAlert className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">100%</div>
-            <p className="text-xs text-slate-500">Operational</p>
           </CardContent>
         </Card>
       </div>

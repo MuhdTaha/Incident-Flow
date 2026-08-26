@@ -1,10 +1,20 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
+import { usePathname } from "next/navigation";
 import { authFetch } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
-type User = {
+export type AppRole = "ADMIN" | "MANAGER" | "ENGINEER" | "BOT";
+
+export type CurrentUser = {
+  id: string;
+  role: AppRole;
+  org_id: string;
+  full_name: string;
+};
+
+type DirectoryUser = {
   id: string;
   full_name: string;
   email: string;
@@ -12,21 +22,55 @@ type User = {
 };
 
 interface UserContextType {
-  users: User[];
-  userMap: Record<string, User>; // Quick lookup by ID
+  currentUser: CurrentUser | null;
+  currentUserLoading: boolean;
+  users: DirectoryUser[];
+  userMap: Record<string, DirectoryUser>;
   loading: boolean;
   refreshUsers: () => Promise<void>;
+  refreshCurrentUser: () => Promise<void>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
+function isAuthPath(pathname: string) {
+  return pathname.startsWith("/login") || pathname.startsWith("/register");
+}
+
 export function UserProvider({ children }: { children: React.ReactNode }) {
-  const { session } = useAuth(); // Get the current session
-  const [users, setUsers] = useState<User[]>([]);
+  const { session } = useAuth();
+  const pathname = usePathname();
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [currentUserLoading, setCurrentUserLoading] = useState(() => Boolean(session));
+  const [users, setUsers] = useState<DirectoryUser[]>([]);
   const [loading, setLoading] = useState(false);
 
+  const fetchCurrentUser = useCallback(async () => {
+    if (!session?.access_token) {
+      setCurrentUser(null);
+      return;
+    }
+
+    setCurrentUserLoading(true);
+    try {
+      const res = await authFetch("/users/me");
+      if (res.status === 401) {
+        setCurrentUser(null);
+        return;
+      }
+      if (res.ok) {
+        const data: CurrentUser = await res.json();
+        setCurrentUser(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch current user:", error);
+      setCurrentUser(null);
+    } finally {
+      setCurrentUserLoading(false);
+    }
+  }, [session]);
+
   const fetchUsers = useCallback(async () => {
-    // Only fetch if there's an active session with a valid access token  
     if (!session?.access_token) {
       return;
     }
@@ -49,25 +93,41 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, [session]);
 
-  // Initial fetch when session becomes available
-  useEffect(() => { 
-    const isAuthPage = window.location.pathname.startsWith("/login") || window.location.pathname.startsWith("/register");
-
-    if (session && !isAuthPage) {
-      fetchUsers(); 
+  useEffect(() => {
+    if (!session) {
+      setCurrentUser(null);
+      setUsers([]);
+      setCurrentUserLoading(false);
+      return;
     }
-  }, [fetchUsers, session]);
 
-  // Create a memoized lookup table: { "uuid-123": { full_name: "...", role: "..." } }
+    if (!isAuthPath(pathname)) {
+      void fetchCurrentUser();
+      void fetchUsers();
+    } else {
+      setCurrentUserLoading(false);
+    }
+  }, [fetchCurrentUser, fetchUsers, session, pathname]);
+
   const userMap = useMemo(() => {
     return users.reduce((acc, user) => {
       acc[user.id] = user;
       return acc;
-    }, {} as Record<string, User>);
+    }, {} as Record<string, DirectoryUser>);
   }, [users]);
 
   return (
-    <UserContext.Provider value={{ users, userMap, loading, refreshUsers: fetchUsers }}>
+    <UserContext.Provider
+      value={{
+        currentUser,
+        currentUserLoading,
+        users,
+        userMap,
+        loading,
+        refreshUsers: fetchUsers,
+        refreshCurrentUser: fetchCurrentUser,
+      }}
+    >
       {children}
     </UserContext.Provider>
   );
@@ -77,4 +137,19 @@ export const useUserDirectory = () => {
   const context = useContext(UserContext);
   if (!context) throw new Error("useUserDirectory must be used within a UserProvider");
   return context;
+};
+
+export const useCurrentUser = () => {
+  const context = useContext(UserContext);
+  if (!context) throw new Error("useCurrentUser must be used within a UserProvider");
+
+  const role = context.currentUser?.role ?? null;
+  return {
+    currentUser: context.currentUser,
+    loading: context.currentUserLoading,
+    role,
+    isAdmin: role === "ADMIN",
+    isManagerOrAdmin: role === "ADMIN" || role === "MANAGER",
+    refreshCurrentUser: context.refreshCurrentUser,
+  };
 };

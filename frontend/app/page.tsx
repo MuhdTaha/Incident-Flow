@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -15,20 +14,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { 
-  AlertCircle, 
-  CheckCircle, 
-  Activity, 
-  ArrowRight, 
   RefreshCw, 
-  ShieldAlert,
   Settings2, 
-  Clock,
   User,
-  LogOut,
-  Settings,
-  Search,
-  Filter,
-  Building2,
 } from "lucide-react";
 import IncidentHistory from "./components/IncidentHistory";
 import CreateIncidentModal from "./components/CreateIncidentModal";
@@ -40,7 +28,7 @@ import { getSevStyles, getStatusIcon } from "@/lib/incident-utils";
 import { useAuth } from "@/context/AuthContext";
 import { useUserDirectory } from "@/context/UserContext";
 import { authFetch } from "@/lib/api";
-import { useLiveIncidents } from "@/hooks/useLiveIncidents";
+import { useIncidentPoll } from "@/hooks/useIncidentPoll";
 
 type Incident = {
   id: string;
@@ -57,11 +45,10 @@ type Incident = {
 export default function IncidentDashboard() {
   const router = useRouter();
   const { user } = useAuth();
-  const { users, userMap } = useUserDirectory();
+  const { userMap } = useUserDirectory();
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
 
   const [actionIncident, setActionIncident] = useState<Incident | null>(null);
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
@@ -80,12 +67,11 @@ export default function IncidentDashboard() {
     }
   }, [user, router]);
 
-  const fetchIncidents = async () => {
+  const fetchIncidents = useCallback(async () => {
     setLoading(true);
     try {
       const res = await authFetch("/incidents");
 
-      // Handle "Unregistered User" case by redirecting to register
       if (res.status === 401) {
         console.warn("User not registered in backend. Redirecting to registration page.");
         router.push("/register");
@@ -101,15 +87,9 @@ export default function IncidentDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
 
-  useEffect(() => {
-    if (user?.id) {
-      fetchIncidents();
-    }
-  }, [user?.id]);
-
-  useLiveIncidents(setIncidents);
+  const { lastUpdated, refresh } = useIncidentPoll(fetchIncidents, Boolean(user?.id));
 
   const selectedIncident = incidents.find(i => i.id === selectedIncidentId);
   const filteredIncidents = useMemo(() => {
@@ -158,10 +138,15 @@ export default function IncidentDashboard() {
           <IncidentFilters filters={filters} setFilters={setFilters} />
           
           <div className="flex items-center gap-3 border-t md:border-t-0 pt-4 md:pt-0">
-             <Button onClick={fetchIncidents} variant="ghost" size="sm" className="text-slate-500">
-                <RefreshCw className="h-4 w-4 mr-2" /> Refresh
+             {lastUpdated && (
+               <span className="text-xs text-slate-400 whitespace-nowrap">
+                 Last updated {lastUpdated.toLocaleTimeString()}
+               </span>
+             )}
+             <Button onClick={refresh} variant="ghost" size="sm" className="text-slate-500" disabled={loading}>
+                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} /> Refresh
              </Button>
-             <CreateIncidentModal onIncidentCreated={fetchIncidents} />
+             <CreateIncidentModal onIncidentCreated={refresh} />
           </div>
         </div>
       </div>
@@ -259,7 +244,7 @@ export default function IncidentDashboard() {
         isOpen={isActionModalOpen}
         onClose={() => setIsActionModalOpen(false)}
         onSuccess={() => {
-          fetchIncidents();
+          void refresh();
           setSelectedIncidentId(actionIncident ? actionIncident.id : null);
         }}
       />

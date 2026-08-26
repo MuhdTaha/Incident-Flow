@@ -11,8 +11,8 @@ Get IncidentFlow running locally for development or demo.
 ## 1. Clone and configure
 
 ```bash
-git clone <repo-url>
-cd incidentflow
+git clone https://github.com/MuhdTaha/Incident-Flow.git
+cd Incident-Flow
 cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env
 ```
@@ -103,23 +103,31 @@ Seed the **deployed** database once:
 
 ```bash
 # With DATABASE_URL pointing at Supabase / production Postgres:
-cd backend && python -m scripts.seed_demo --refresh --actions 4
+cd backend && python3 -m scripts.seed_demo --refresh --actions 4
 ```
 
 Or trigger **Actions → Demo Seed Refresh → Run workflow** after the secret is set.
 
-## 5. Deploy notes (Render + GitHub)
+## 5. Deploy notes (Vercel + Render + Supabase)
 
-`backend/render.yaml` defines:
-
-| Service | Role |
-|---------|------|
-| `incidentflow-api` | FastAPI |
-| `incidentflow-redis` | Celery broker |
-| `incidentflow-worker` | Runs tasks (email, SLA, demo refresh) |
-| `incidentflow-beat` | Schedules SLA + demo refresh |
+| Piece | Where |
+|-------|--------|
+| Frontend | Vercel — project **Root Directory** = `frontend`. Set `NEXT_PUBLIC_API_URL` to `https://<render-api>/api/v1` and the same Supabase URL/anon key as local. |
+| API + Redis + worker + beat | Render Blueprint [`backend/render.yaml`](../backend/render.yaml). API start command runs `alembic upgrade head` then uvicorn. |
+| Postgres | Existing Supabase project (`DATABASE_URL` on API, worker, and beat) |
+| Auth | Same Supabase project (JWT secret on the API) |
 
 Set the same `DATABASE_URL` (and optional `DEMO_ORG_ID`) on API, worker, and beat.
+
+**Seed the deployed database once** (from `backend/` with production `DATABASE_URL` / `SUPABASE_*` in the environment):
+
+```bash
+DEMO_PASSWORD=IncidentFlow-Demo-2026 python3 -m scripts.seed_demo --provision-auth --refresh --actions 4
+```
+
+`SUPABASE_KEY` must be the **secret / service_role** key (Dashboard → Settings → API). The publishable/anon key cannot create users. `python3` is required on Ubuntu/WSL if `python` is not installed.
+
+That creates login-able demo users (Jordan / Sarah / Alex), aligns their Postgres IDs with Auth, and fills the catalog. Credentials: [DEMO.md](DEMO.md).
 
 For the GitHub cron backup: **Settings → Secrets → Actions** → add `DATABASE_URL` matching the Render/Supabase database.
 

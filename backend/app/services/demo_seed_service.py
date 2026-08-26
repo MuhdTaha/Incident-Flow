@@ -14,6 +14,8 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Sequence, Tuple
 from uuid import UUID, uuid4
 
+import httpx
+
 from sqlalchemy.orm import Session
 
 from app.core.constants import (
@@ -233,6 +235,36 @@ def resolve_org_id() -> UUID:
   return DEFAULT_ORG_ID
 
 
+def _strip_env(value: Optional[str]) -> str:
+  return (value or "").strip().strip('"').strip("'")
+
+
+def supabase_admin_config(url: Optional[str], key: Optional[str]) -> Tuple[str, dict]:
+  """
+  Auth Admin HTTP config.
+
+  supabase-py 2.6 only accepts legacy JWTs (eyJ...). Newer projects issue
+  sb_secret_ keys, so we call GoTrue directly instead of create_client().
+  """
+  base = _strip_env(url).rstrip("/")
+  secret = _strip_env(key)
+  if not base or not secret:
+    raise RuntimeError("SUPABASE_URL and SUPABASE_KEY are required to provision demo logins")
+  if secret.startswith("sb_publishable_") or secret.startswith("sb_anon_"):
+    raise RuntimeError(
+      "SUPABASE_KEY is the publishable/anon key. Use the secret key "
+      "(Dashboard → Settings → API → secret / service_role)."
+    )
+  if secret.startswith("your-") or secret == "your-service-role-key":
+    raise RuntimeError("SUPABASE_KEY is still the placeholder from .env.example")
+  headers = {
+    "apikey": secret,
+    "Authorization": f"Bearer {secret}",
+    "Content-Type": "application/json",
+  }
+  return base, headers
+
+
 class DemoSeedService:
   def __init__(self, db: Session, org_id: Optional[UUID] = None):
     self.db = db
@@ -240,6 +272,28 @@ class DemoSeedService:
     self._actors: dict[str, models.User] = {}
 
   # --- public API ---
+
+  def provision_logins(self, password: str) -> dict:
+    """Create/update Supabase Auth users and align Postgres IDs so demo emails can sign in."""
+    if not password or len(password) < 8:
+      raise RuntimeError("DEMO_PASSWORD must be at least 8 characters")
+
+    base_url, headers = supabase_admin_config(
+      os.getenv("SUPABASE_URL"),
+      os.getenv("SUPABASE_KEY"),
+    )
+    self._ensure_org()
+    provisioned = []
+    for spec in DEMO_USER_SPECS:
+      auth_id = self._ensure_auth_user(base_url, headers, spec, password)
+      self._align_local_user(spec, UUID(str(auth_id)))
+      provisioned.append({
+        "email": spec["email"],
+        "id": str(auth_id),
+        "role": spec["role"].value,
+      })
+    self.db.commit()
+    return {"org_id": str(self.org_id), "users": provisioned}
 
   def seed(self) -> dict:
     """Ensure demo users + catalog incidents/timelines exist. Idempotent."""
@@ -316,6 +370,177 @@ class DemoSeedService:
     self.db.add(org)
     self.db.flush()
     return org
+
+  def _ensure_auth_user(self, base_url: str, headers: dict, spec: dict, password: str):
+    email = spec["email"]
+    existing_id = self._find_auth_user_id(base_url, headers, email)
+    if existing_id:
+      self._admin_request(
+        "PUT",
+        f"{base_url}/auth/v1/admin/users/{existing_id}",
+        headers,
+        json={"password": password, "email_confirm": True},
+      )
+      return existing_id
+
+    payload = {
+      "email": email,
+      "password": password,
+      "email_confirm": True,
+      "user_metadata": {"full_name": spec["full_name"]},
+    }
+    # Reuse the seeded Postgres id so the on_auth_user_created trigger
+    # hits ON CONFLICT (id) instead of failing on users_email_key.
+    local = self.db.query(models.User).filter(models.User.email == email).first()
+    if local:
+      payload["id"] = str(local.id)
+
+    try:
+      created = self._admin_request(
+        "POST",
+        f"{base_url}/auth/v1/admin/users",
+        headers,
+        json=payload,
+      )
+      return created["id"]
+    except RuntimeError as exc:
+      message = str(exc).lower()
+      if "duplicate" not in message and "already" not in message and "23505" not in message:
+        raise
+      found = self._find_auth_user_id(base_url, headers, email)
+      if found:
+        self._admin_request(
+          "PUT",
+          f"{base_url}/auth/v1/admin/users/{found}",
+          headers,
+          json={"password": password, "email_confirm": True},
+        )
+        return found
+      if not local:
+        raise
+      # public.users already has this email (seeded). Free the unique key,
+      # create Auth, then _align_local_user remaps FKs onto the Auth UUID.
+      local.email = f"migrating-{local.id}@incidentflow.local"
+      self.db.flush()
+      created = self._admin_request(
+        "POST",
+        f"{base_url}/auth/v1/admin/users",
+        headers,
+        json={
+          "email": email,
+          "password": password,
+          "email_confirm": True,
+          "user_metadata": {"full_name": spec["full_name"]},
+        },
+      )
+      return created["id"]
+
+  def _find_auth_user_id(self, base_url: str, headers: dict, email: str) -> Optional[str]:
+    target = email.lower()
+    for page in range(1, 11):
+      payload = self._admin_request(
+        "GET",
+        f"{base_url}/auth/v1/admin/users",
+        headers,
+        params={"page": page, "per_page": 200},
+      )
+      users = payload.get("users", []) if isinstance(payload, dict) else payload
+      if not users:
+        return None
+      for user in users:
+        if self._auth_user_email(user) == target:
+          return user["id"]
+      if len(users) < 200:
+        return None
+    return None
+
+  def _auth_user_email(self, user: dict) -> str:
+    email = (user.get("email") or "").lower()
+    if email:
+      return email
+    for identity in user.get("identities") or []:
+      data = identity.get("identity_data") or {}
+      candidate = (data.get("email") or identity.get("email") or "").lower()
+      if candidate:
+        return candidate
+    return ""
+
+  def _admin_request(self, method: str, url: str, headers: dict, **kwargs) -> dict:
+    try:
+      response = httpx.request(method, url, headers=headers, timeout=30, **kwargs)
+    except httpx.HTTPError as exc:
+      raise RuntimeError(f"Supabase Auth Admin request failed: {exc}") from exc
+    if response.status_code >= 400:
+      detail = response.text.strip()[:400]
+      raise RuntimeError(
+        f"Supabase Auth Admin {method} {response.status_code}: {detail or response.reason_phrase}"
+      )
+    if not response.content:
+      return {}
+    data = response.json()
+    return data if isinstance(data, dict) else {"users": data}
+
+  def _align_local_user(self, spec: dict, auth_id: UUID) -> None:
+    """Point the local persona row at the Supabase Auth UUID (FK-safe)."""
+    by_id = self.db.query(models.User).filter(models.User.id == auth_id).first()
+    by_email = self.db.query(models.User).filter(models.User.email == spec["email"]).first()
+
+    if by_id and by_email and by_id.id != by_email.id:
+      raise RuntimeError(
+        f"Cannot align {spec['email']}: another user already has auth id {auth_id}"
+      )
+
+    if by_id:
+      by_id.email = spec["email"]
+      by_id.full_name = spec["full_name"]
+      by_id.role = spec["role"]
+      by_id.organization_id = self.org_id
+      self.db.flush()
+      return
+
+    if not by_email:
+      self.db.add(models.User(
+        id=auth_id,
+        email=spec["email"],
+        full_name=spec["full_name"],
+        role=spec["role"],
+        organization_id=self.org_id,
+      ))
+      self.db.flush()
+      return
+
+    if by_email.id == auth_id:
+      by_email.role = spec["role"]
+      by_email.organization_id = self.org_id
+      by_email.full_name = spec["full_name"]
+      self.db.flush()
+      return
+
+    old_id = by_email.id
+    by_email.email = f"migrating-{old_id}@incidentflow.local"
+    self.db.flush()
+
+    replacement = models.User(
+      id=auth_id,
+      email=spec["email"],
+      full_name=spec["full_name"],
+      role=spec["role"],
+      organization_id=self.org_id,
+    )
+    self.db.add(replacement)
+    self.db.flush()
+
+    self.db.query(models.Incident).filter(models.Incident.owner_id == old_id).update(
+      {models.Incident.owner_id: auth_id}, synchronize_session=False
+    )
+    self.db.query(models.IncidentEvent).filter(models.IncidentEvent.actor_id == old_id).update(
+      {models.IncidentEvent.actor_id: auth_id}, synchronize_session=False
+    )
+    self.db.query(models.IncidentAttachment).filter(
+      models.IncidentAttachment.uploaded_by == old_id
+    ).update({models.IncidentAttachment.uploaded_by: auth_id}, synchronize_session=False)
+    self.db.delete(by_email)
+    self.db.flush()
 
   def _ensure_users(self) -> None:
     bot = self.db.query(models.User).filter(models.User.id == SYSTEM_BOT_ID).first()
@@ -571,6 +796,16 @@ class DemoSeedService:
     for incident in live[keep:]:
       self.db.delete(incident)
     self.db.flush()
+
+
+def run_provision_logins(password: str, org_id: Optional[UUID] = None) -> dict:
+  from app.db.session import SessionLocal
+
+  db = SessionLocal()
+  try:
+    return DemoSeedService(db, org_id=org_id).provision_logins(password)
+  finally:
+    db.close()
 
 
 def run_seed(org_id: Optional[UUID] = None) -> dict:

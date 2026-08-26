@@ -67,6 +67,7 @@ The API resolves the user from Postgres and enforces `organization_id` on every 
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
+| GET | `/users/me` | Yes | Current user `{ id, role, org_id, full_name }` from Postgres (not JWT `app_metadata`) |
 | GET | `/users` | Yes | List org users |
 | PATCH | `/users/{id}/role` | Admin | Change role |
 | DELETE | `/users/{id}` | Admin | Remove user |

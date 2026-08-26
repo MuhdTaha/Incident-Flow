@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { ArrowRightLeft, MessageSquare, Pencil, Trash2, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useCurrentUser } from "@/context/UserContext";
 import { authFetch } from "@/lib/api";
 
 type Incident = {
@@ -42,6 +43,7 @@ type IncidentActionModalProps = {
 
 export default function IncidentActionModal({ incident, isOpen, onClose, onSuccess }: IncidentActionModalProps) {
   const { user } = useAuth();
+  const { isAdmin, isManagerOrAdmin } = useCurrentUser();
 
   // State
   const [actionType, setActionType] = useState<"TRANSITION" | "COMMENT" | "EDIT">("TRANSITION");
@@ -53,11 +55,6 @@ export default function IncidentActionModal({ incident, isOpen, onClose, onSucce
   const [severity, setSeverity] = useState<"SEV1" | "SEV2" | "SEV3" | "SEV4">("SEV4");
   const [ownerId, setOwnerId] = useState<string>("");
   const [users, setUsers] = useState<User[]>([]);
-
-  // Permissions
-  const userRole = user?.app_metadata.role;
-  const isManagerOrAdmin = userRole === "ADMIN" || userRole === "MANAGER";
-  const isAdmin = userRole === "ADMIN";
 
   // Fetch Users when modal opens (for reassignment)
   useEffect(() => {

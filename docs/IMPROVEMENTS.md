@@ -14,11 +14,7 @@ Prioritized by impact vs. effort. See [PRD.md](PRD.md) for shipped scope and [DE
 
 **Impact:** Admin console and manager actions may not work for real users even when the API allows them.
 
-**Fix:**
-- Add `GET /users/me` returning `{ id, role, org_id, full_name }`
-- Fetch in `UserContext`; use backend role everywhere—not `app_metadata`
-
-**Interview angle:** *Auth identity from Supabase; authorization from our DB.*
+**Status:** Shipped — `GET /users/me` + `UserContext` (`useCurrentUser`). Admin console, manager edit/delete, and nav use the Postgres role.
 
 ---
 
@@ -53,10 +49,7 @@ See [SETUP.md](SETUP.md#demo-data).
 
 **Impact:** Feature appears to exist but does nothing locally—awkward if mentioned in demos.
 
-**Options (pick one):**
-- Remove hook; rely on manual refresh (simplest)
-- Poll every 30s with a “Last updated” label
-- Wire Supabase replication (likely overkill)
+**Status:** Shipped — dashboard polls `GET /incidents` every 30s and shows **Last updated**. Manual Refresh remains. Do not claim realtime.
 
 ---
 
@@ -101,20 +94,13 @@ Add to README:
 
 **Problem:** Profile and Settings in nav do nothing; Admin link visible to all roles.
 
-**Fix:**
-- Hide Admin Console unless `role === ADMIN`
-- Remove or disable non-functional menu items
+**Status:** Shipped — Admin Console only if `role === ADMIN`. Profile/Settings removed. Fake 100% health card removed.
 
 ---
 
 ### 9. Demo script (`docs/DEMO.md`)
 
-Rehearsed 5-minute flow:
-1. Login as engineer → create SEV2 incident
-2. Transition to INVESTIGATING → add comment
-3. Upload attachment
-4. Login as admin → analytics
-5. Generate post-mortem
+**Status:** Shipped — [DEMO.md](DEMO.md) with elevator pitch, screenshot list, and 5-minute script.
 
 ---
 
@@ -175,15 +161,14 @@ Replace `print()` in Celery tasks and services with `logging`. One line in DESIG
 
 ```
 Week 1 — must-have for employers
-  ├── Fix role / UserContext + GET /users/me
-  ├── Deploy live demo (seed/refresh already shipped)
-  ├── README: screenshots, demo URL, video
-  └── docs/DEMO.md script
+  ├── [x] Fix role / UserContext + GET /users/me
+  ├── [ ] Deploy live demo (Vercel + Render; provision-auth + seed)
+  ├── [x] README + docs/DEMO.md (screenshots after first live capture)
+  └── [x] Polling instead of fake realtime; hide dead Admin/Profile UI
 
 Week 2 — polish
-  ├── Toasts + hide dead UI
-  ├── Fix or remove realtime hook
-  ├── One E2E happy-path test
+  ├── Toasts
+  ├── One E2E happy-path test (login flow exists)
   └── CI badge
 
 Week 3 — optional
@@ -197,6 +182,7 @@ Week 3 — optional
 
 | Topic | One-liner |
 |-------|-----------|
+| Identity vs authz | JWT proves who you are; `GET /users/me` is the role/org source of truth |
 | FSM | Invalid state changes rejected; covered by unit + API tests |
 | Multi-tenancy | Every query scoped by `organization_id`; cross-org → 404 |
 | Layering | Thin routes; services own transactions |
@@ -204,7 +190,7 @@ Week 3 — optional
 | Presigned uploads | Files bypass API; DB holds metadata only |
 | AI post-mortems | Org access verified before Groq + S3 |
 
-Avoid overselling realtime, SSO, or full observability unless implemented.
+Avoid overselling websockets, SSO, or full observability unless implemented. The dashboard **polls every 30s**.
 
 ---
 
@@ -212,8 +198,8 @@ Avoid overselling realtime, SSO, or full observability unless implemented.
 
 - [x] Seeded demo catalog + scheduled refresh (`make seed`, Beat, GitHub Actions)
 - [ ] Live URL works with seeded data (verify after Render worker/beat + GH secret)
-- [ ] Admin/manager UI matches backend roles
+- [x] Admin/manager UI matches backend roles (`GET /users/me`)
 - [x] 5-minute demo runs without manual DB setup (after seed / auto-refresh)
-- [ ] README has screenshots + video link
-- [ ] No committed secrets; demo account documented
-- [ ] Critical path has at least one E2E test
+- [x] README + [DEMO.md](DEMO.md) (add screenshots under `docs/screenshots/` after first live capture)
+- [x] No committed secrets; demo account documented in README / DEMO.md
+- [x] Critical path has at least one E2E test

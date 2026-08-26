@@ -69,6 +69,37 @@ def test_user_organization(client, db, admin_user, test_organization, other_orga
   assert data["id"] == str(test_organization.id)
   
 
+def test_get_me_unauthorized(client):
+  app.dependency_overrides.pop(get_current_user, None)
+  response = client.get("/api/v1/users/me")
+  assert response.status_code == 401
+
+
+def test_get_me_returns_backend_role(client, auth_override, admin_user, test_organization):
+  app.dependency_overrides[get_current_user] = lambda: admin_user
+  response = client.get("/api/v1/users/me")
+
+  assert response.status_code == 200
+  data = response.json()
+  assert data == {
+    "id": str(admin_user.id),
+    "role": "ADMIN",
+    "org_id": str(test_organization.id),
+    "full_name": admin_user.full_name,
+  }
+
+
+def test_get_me_engineer_role(client, auth_override, engineer_user, test_organization):
+  app.dependency_overrides[get_current_user] = lambda: engineer_user
+  response = client.get("/api/v1/users/me")
+
+  assert response.status_code == 200
+  data = response.json()
+  assert data["role"] == "ENGINEER"
+  assert data["id"] == str(engineer_user.id)
+  assert data["org_id"] == str(test_organization.id)
+
+
 def test_list_users_scoped(client, db, auth_override, admin_user, test_organization, other_organization):
   _create_user(db, test_organization.id, UserRole.MANAGER, "mgr@users.com")
   _create_user(db, other_organization.id, UserRole.ADMIN, "admin@other.com")

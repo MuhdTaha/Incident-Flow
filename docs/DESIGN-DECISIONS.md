@@ -84,10 +84,26 @@ Key technical choices and trade-offs. Useful for portfolio reviewers evaluating 
 
 ---
 
+## 10. Auth identity vs authorization
+
+**Decision:** Supabase JWT proves *who* the caller is. Postgres `User.role` / `organization_id` decide *what* they can do. The frontend loads that profile via `GET /users/me` into `UserContext`.
+
+**Why:** JWT `app_metadata.role` is not written by this app, so gating Admin / manager UI on it hid features from real users. Identity stays with the IdP; authorization stays in our DB.
+
+---
+
+## 11. Dashboard polling, not realtime
+
+**Decision:** The incident queue refreshes on a 30-second poll plus a manual Refresh button, with a “Last updated” timestamp.
+
+**Why:** Incident rows live in app Postgres (local Docker or hosted), not in Supabase tables. A Supabase Realtime subscription on `incidents` would never fire. Polling is honest about that constraint.
+
+---
+
 ## Known limitations (honest scope boundaries)
 
 - Analytics SQL targets Postgres features (test suite mocks some queries for SQLite)
-- No real-time websocket updates (polling / refresh on navigation)
+- No websocket / live updates (30s poll + manual refresh)
 - Invite flow requires Supabase service role key
 - E2E tests need a pre-provisioned Supabase test user
 - Demo seed targets one org (`DEMO_ORG_ID`); users in other orgs will not see the catalog

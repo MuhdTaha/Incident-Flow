@@ -20,7 +20,7 @@ High-level design of IncidentFlow for reviewers and contributors.
                     └───────────────────────────────────
 ```
 
-**Auth flow:** Supabase handles sign-up/login. The frontend sends the Supabase JWT as `Authorization: Bearer`. The API validates the token, loads the user from Postgres, and scopes all queries to `organization_id`.
+**Auth flow:** Supabase handles sign-up/login. The frontend sends the Supabase JWT as `Authorization: Bearer`. The API validates the token, loads the user from Postgres (`GET /users/me`), and scopes all queries to `organization_id`. UI role gates (Admin console, manager edit/delete) use the Postgres role, not JWT `app_metadata`.
 
 ## Backend layers
 
@@ -96,7 +96,7 @@ Attachments and post-mortems are **not** stored in Postgres:
 | `/postmortem/[id]` | View / generate AI post-mortem |
 | `/login`, `/register` | Supabase auth + org onboarding |
 
-State: React Context for current user; API calls via fetch with Supabase session token.
+State: `AuthContext` holds the Supabase session (identity). `UserContext` loads `GET /users/me` for `{ id, role, org_id, full_name }` and the org user directory. Dashboard polls `GET /incidents` every 30s (not realtime).
 
 ## Security summary
 

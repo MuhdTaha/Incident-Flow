@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { authFetch } from '@/lib/api';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { useAuth } from '@/context/AuthContext';
+import { useCurrentUser } from '@/context/UserContext';
 
 import { 
   FileText, 
@@ -33,6 +34,7 @@ type AttachmentManagerProps = {
 
 export default function AttachmentManager({ incidentId, onAttachmentChange }: AttachmentManagerProps) {
   const { user } = useAuth();
+  const { currentUser, isAdmin } = useCurrentUser();
   const { uploadFile, status, progress, error, reset } = useFileUpload();
 
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -59,8 +61,6 @@ export default function AttachmentManager({ incidentId, onAttachmentChange }: At
   }, [fetchAttachments]);
 
   if (!user) return null;
-  const name = user.user_metadata?.full_name?.split(" ").filter((n: string) => n) || [];
-  const role = user.app_metadata.role? user.app_metadata.role : "User";
 
   // 2. Handle Drag and Drop Events
   const onDragOver = (e: React.DragEvent) => {
@@ -267,7 +267,7 @@ export default function AttachmentManager({ incidentId, onAttachmentChange }: At
                     <Download className="h-4 w-4 text-green-500" />
                   </Button>
                   
-                  {(role === 'ADMIN' || name.includes(att.uploaded_by)) && (
+                  {(isAdmin || att.uploaded_by === currentUser?.full_name) && (
                     <Button 
                         variant="ghost" 
                         size="icon" 

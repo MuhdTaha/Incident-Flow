@@ -4,11 +4,19 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.db import models
 from app.schemas import user as user_schemas
-from app.schemas import common as org_schemas
 from app.api.deps import get_current_user, get_current_org_id, get_user_service, require_admin
 from app.services.user_service import UserService
 
 router = APIRouter()
+
+@router.get("/me", response_model=user_schemas.CurrentUserRead)
+def get_me(current_user: models.User = Depends(get_current_user)):
+  return user_schemas.CurrentUserRead(
+    id=current_user.id,
+    role=current_user.role,
+    org_id=current_user.organization_id,
+    full_name=current_user.full_name,
+  )
 
 @router.get("/", response_model=List[user_schemas.UserRead])
 def get_users(

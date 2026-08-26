@@ -26,10 +26,27 @@ jest.mock('@/lib/api', () => ({
 // You can mock them to simplify the test.
 jest.mock('@/app/components/UserNav', () => () => <div data-testid="user-nav">UserNav</div>)
 jest.mock('@/context/AuthContext', () => ({
-  useAuth: () => ({ user: { id: 'user-1', app_metadata: { role: 'ENGINEER' } } }),
+  useAuth: () => ({ user: { id: 'user-1' } }),
 }))
 jest.mock('@/context/UserContext', () => ({
   useUserDirectory: () => ({ users: [], userMap: {}, loading: false, refreshUsers: jest.fn() }),
+  useCurrentUser: () => ({
+    currentUser: { id: 'user-1', role: 'ENGINEER', org_id: 'org-1', full_name: 'Test User' },
+    loading: false,
+    role: 'ENGINEER',
+    isAdmin: false,
+    isManagerOrAdmin: false,
+    refreshCurrentUser: jest.fn(),
+  }),
+}))
+jest.mock('@/hooks/useIncidentPoll', () => ({
+  useIncidentPoll: (fetcher: () => Promise<void>, enabled: boolean) => {
+    const React = require('react')
+    React.useEffect(() => {
+      if (enabled) fetcher()
+    }, [enabled, fetcher])
+    return { lastUpdated: new Date('2026-08-25T12:00:00Z'), refresh: fetcher }
+  },
 }))
 jest.mock('@/app/components/IncidentFilters', () => ({
   IncidentFilters: ({ setFilters }: { setFilters: (next: any) => void }) => (
@@ -97,6 +114,7 @@ describe('IncidentDashboard', () => {
 
     // Check if SEV1 badge is rendered
     expect(screen.getByText('SEV1')).toBeInTheDocument()
+    expect(screen.getByText(/Last updated/)).toBeInTheDocument()
     
     // Check if the mock API was actually called
     expect(authFetch).toHaveBeenCalledWith('/incidents')

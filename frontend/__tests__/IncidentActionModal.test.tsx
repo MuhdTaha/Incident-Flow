@@ -6,7 +6,17 @@ import { authFetch } from '@/lib/api'
 let mockUserRole = 'ENGINEER'
 
 jest.mock('@/context/AuthContext', () => ({
-  useAuth: () => ({ user: { id: 'user-1', app_metadata: { role: mockUserRole } } }),
+  useAuth: () => ({ user: { id: 'user-1' } }),
+}))
+
+jest.mock('@/context/UserContext', () => ({
+  useCurrentUser: () => ({
+    currentUser: { id: 'user-1', role: mockUserRole, org_id: 'org-1', full_name: 'Test User' },
+    loading: false,
+    role: mockUserRole,
+    isAdmin: mockUserRole === 'ADMIN',
+    isManagerOrAdmin: mockUserRole === 'ADMIN' || mockUserRole === 'MANAGER',
+  }),
 }))
 
 jest.mock('@/components/ui/dialog', () => ({
