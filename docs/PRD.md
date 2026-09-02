@@ -25,7 +25,7 @@ IncidentFlow is a **multi-tenant SaaS incident management tool** for small-to-mi
 | Goal | Measure |
 |------|---------|
 | Reliable incident tracking | Every action logged; invalid state changes rejected |
-| Fast onboarding | Sign up → create org → declare incident in &lt; 5 min |
+| Fast onboarding | Sign up → create org → invite teammates → declare incident in &lt; 5 min |
 | Operational visibility | Admin dashboard with MTTR, volume, user performance |
 | Safe multi-tenancy | Zero cross-org data access in API tests |
 
@@ -55,7 +55,11 @@ IncidentFlow is a **multi-tenant SaaS incident management tool** for small-to-mi
 
 1. User signs up via Supabase (email/password)
 2. User names their organization → backend creates org + admin user
-3. Admin invites teammates by email (Supabase invite + local user record)
+3. Dashboard opens an invite dialog (`/?invite=1`); admin can skip or send emails
+4. Admin can invite again later from the Admin console
+5. Invitee opens the Supabase email → `/invite` → sets name and password → joins that org
+
+Invited users never create a second organization (`AUTH-4`).
 
 ### 6.2 Incident response
 
@@ -81,7 +85,7 @@ IncidentFlow is a **multi-tenant SaaS incident management tool** for small-to-mi
 |----|-------------|----------|
 | AUTH-1 | Users authenticate via Supabase JWT; API validates every request | P0 |
 | AUTH-2 | New users register an organization on first login | P0 |
-| AUTH-3 | Admins invite users by email into their org | P1 |
+| AUTH-3 | Admins invite users by email into their org (post-create dialog + Admin console) | P1 |
 | AUTH-4 | Users cannot register a second org if already provisioned | P0 |
 
 ### 7.2 Incidents
@@ -174,17 +178,19 @@ Engineers cannot assign incidents to other users on create.
 |--------|-------|--------|
 | Login | `/login` | Public |
 | Register org | `/register` | Authenticated (new users) |
+| Accept invite | `/invite` | Invite link (Supabase session) |
 | Incident dashboard | `/` | All roles |
 | Admin console | `/admin` | Admin |
 | Post-mortem viewer | `/postmortem/[id]` | All roles (org-scoped) |
 
-**Dashboard features:** stat cards, severity/status/assignee filters, incident table, detail panel with history, create/transition modals.
+**Dashboard features:** stat cards, severity/status/assignee filters, incident table, detail panel with history, create/transition modals. After org create, an invite-teammates dialog (`/?invite=1`). Admin console: **Invite teammate**.
 
 ---
 
 ## 10. Success criteria (v1 complete)
 
-- [x] User can sign up, create org, and declare an incident
+- [x] User can sign up, create org, invite teammates by email, and declare an incident
+- [x] Invitees join the inviting org via `/invite` (name + password); they cannot register a second org
 - [x] FSM rejects invalid transitions via API
 - [x] Audit log captures status, severity, owner, comment, attachment events
 - [x] Cross-org access blocked on incidents, events, attachments, post-mortems

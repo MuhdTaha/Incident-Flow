@@ -20,6 +20,9 @@ class UserRepository:
   def get_by_id_global(self, user_id: UUID) -> Optional[User]:
     return self.db.query(User).filter(User.id == user_id).first()
 
+  def get_by_email(self, email: str) -> Optional[User]:
+    return self.db.query(User).filter(func.lower(User.email) == email.lower()).first()
+
   def list_all(self, org_id: UUID) -> List[User]:
     return self.db.query(User).filter(
       User.organization_id == org_id,

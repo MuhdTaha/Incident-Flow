@@ -150,3 +150,35 @@ def test_delete_user_admin_only(client, db, auth_override, admin_user, engineer_
   assert response.status_code == 200
 
   assert db.query(User).filter(User.id == target_user.id).first() is None
+
+
+def test_patch_me_updates_full_name(client, auth_override, engineer_user, db):
+  app.dependency_overrides[get_current_user] = lambda: engineer_user
+  response = client.patch("/api/v1/users/me", json={"full_name": "Ada Lovelace"})
+
+  assert response.status_code == 200
+  data = response.json()
+  assert data["full_name"] == "Ada Lovelace"
+  assert data["role"] == "ENGINEER"
+  db.refresh(engineer_user)
+  assert engineer_user.full_name == "Ada Lovelace"
+
+
+def test_patch_me_ignores_role_escalation(client, auth_override, engineer_user, db):
+  app.dependency_overrides[get_current_user] = lambda: engineer_user
+  response = client.patch(
+    "/api/v1/users/me",
+    json={"full_name": "Ada", "role": "ADMIN"},
+  )
+
+  assert response.status_code == 200
+  db.refresh(engineer_user)
+  assert engineer_user.role == UserRole.ENGINEER
+
+
+def test_patch_me_rejects_blank_name(client, auth_override, engineer_user):
+  app.dependency_overrides[get_current_user] = lambda: engineer_user
+  response = client.patch("/api/v1/users/me", json={"full_name": "   "})
+
+  assert response.status_code == 400
+

@@ -15,6 +15,19 @@ class UserService:
   def list_users(self, org_id: UUID):
     return self.repo.list_all(org_id)
 
+  def update_me(self, user, update: schemas.UserUpdate):
+    if update.full_name is not None:
+      name = update.full_name.strip()
+      if not name:
+        raise HTTPException(status_code=400, detail="Full name is required")
+      user.full_name = name
+    if update.phone_number is not None:
+      user.phone_number = update.phone_number
+    self.repo.flush()
+    self.repo.refresh(user)
+    self._commit()
+    return user
+
   def update_role(self, user_id: UUID, role_update: schemas.RoleUpdate, current_user_id: UUID, org_id: UUID):
     user = self.repo.get_by_id(user_id, org_id)
     if not user:

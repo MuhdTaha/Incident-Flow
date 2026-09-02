@@ -25,6 +25,7 @@ cp frontend/.env.example frontend/.env
 | `SUPABASE_JWT_SECRET` | Yes | JWT secret from Supabase → Project Settings → API |
 | `SUPABASE_URL` | For invites | Supabase project URL |
 | `SUPABASE_KEY` | For invites | Supabase service role key |
+| `FRONTEND_URL` | For invites | App origin used in invite emails. Local default: `http://localhost:3000` |
 | `GROQ_API_KEY` | For AI post-mortems | Groq API key |
 | `MAILJET_*` | Optional | Production email alerts (Mailhog used locally) |
 | `S3_*` | Optional | Defaults work with bundled MinIO |
@@ -61,7 +62,17 @@ make seed        # populate demo incidents + audit timelines
 1. Open http://localhost:3000/register
 2. Sign up via Supabase (email/password)
 3. Enter an organization name — backend creates org + admin user
-4. Sign in and create incidents from the dashboard
+4. After a short success screen, the dashboard opens an **invite teammates** dialog (`/?invite=1`)
+5. Invite by email (or skip); teammates can also be invited later from **Admin Console**
+6. Declare incidents from the dashboard
+
+**Invited teammates:** the email from Supabase includes a link to `/invite`. They set a name and password, then land in the org they were invited to — they do not create a second workspace.
+
+In the Supabase dashboard, add these **Redirect URLs** (Authentication → URL Configuration):
+
+- `http://localhost:3000/invite`
+- `http://localhost:3000/register`
+- Your production origin + `/invite` (and `/register`) when deployed
 
 **Portfolio demo tip:** Seed data lands in the **Default Org**. Either register into that org (or set `DEMO_ORG_ID` to your org’s UUID) so the dashboard shows the catalog after login.
 
@@ -113,7 +124,7 @@ Or trigger **Actions → Demo Seed Refresh → Run workflow** after the secret i
 | Piece | Where |
 |-------|--------|
 | Frontend | Vercel — project **Root Directory** = `frontend`. Set `NEXT_PUBLIC_API_URL` to `https://<render-api>/api/v1` and the same Supabase URL/anon key as local. |
-| API + Redis + worker + beat | Render Blueprint [`backend/render.yaml`](../backend/render.yaml). API start command runs `alembic upgrade head` then uvicorn. |
+| API + Redis + worker + beat | Render Blueprint [`backend/render.yaml`](../backend/render.yaml). API start command runs `alembic upgrade head` then uvicorn. Set `FRONTEND_URL` on the API to the Vercel origin so invite emails redirect to `/invite`. |
 | Postgres | Existing Supabase project (`DATABASE_URL` on API, worker, and beat) |
 | Auth | Same Supabase project (JWT secret on the API) |
 
@@ -163,3 +174,6 @@ make clean           # stop + remove volumes (wipes DB)
 | Dashboard empty after seed | Confirm your user is in `DEMO_ORG_ID` / Default Org |
 | Deployed dashboard empty | Run `python -m scripts.seed_demo --refresh` against deployed `DATABASE_URL`, or trigger **Demo Seed Refresh** |
 | Demo refresh not running on Render | Ensure worker + beat are deployed and share Redis/`DATABASE_URL`; or rely on the GitHub Actions cron |
+| Invite returns 501 / “Supabase credentials not configured” | Set `SUPABASE_URL` and the **service_role** `SUPABASE_KEY` (not the anon key) |
+| Invite returns 400 / “Invalid API key” | Rotate `SUPABASE_KEY` to the current secret key from Dashboard → Settings → API |
+| Invite email link lands on the wrong page | Add `http://localhost:3000/invite` (and production `/invite`) to Supabase Auth **Redirect URLs**; set `FRONTEND_URL` on the API |

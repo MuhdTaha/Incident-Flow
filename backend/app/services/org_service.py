@@ -8,12 +8,25 @@ from app.db import models
 from app.repositories.user_repo import UserRepository
 from supabase import create_client, Client
 
+INVITABLE_ROLES = {
+  models.UserRole.ENGINEER,
+  models.UserRole.MANAGER,
+  models.UserRole.ADMIN,
+}
+
+
+def _display_name_from_email(email: str) -> str:
+  local = email.split("@")[0].replace(".", " ").replace("_", " ").replace("-", " ").strip()
+  return local.title() if local else "New teammate"
+
+
 class OrganizationService:
   def __init__(self, db: Session):
     self.db = db
     self.repo = UserRepository(db)
     self.supabase_url = os.getenv("SUPABASE_URL")
     self.supabase_key = os.getenv("SUPABASE_KEY")
+    self.frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000").rstrip("/")
     self.supabase = None
 
     if self.supabase_url and self.supabase_key:
@@ -75,21 +88,34 @@ class OrganizationService:
       self.db.rollback()
       raise HTTPException(status_code=400, detail=f"Registration failed: {str(e)}")
 
-  def invite_user(self, email: str, role: str, org_id: UUID):
+  def invite_user(self, email: str, role: models.UserRole, org_id: UUID):
+    if role not in INVITABLE_ROLES:
+      raise HTTPException(status_code=400, detail="Role must be ENGINEER, MANAGER, or ADMIN")
+
+    existing = self.repo.get_by_email(email)
+    if existing:
+      raise HTTPException(status_code=409, detail="A user with this email already exists")
+
     if not self.supabase:
       raise HTTPException(status_code=501, detail="Supabase credentials not configured")
 
     try:
-      response = self.supabase.auth.admin.invite_user_by_email(email)
+      response = self.supabase.auth.admin.invite_user_by_email(
+        email,
+        {
+          "redirect_to": f"{self.frontend_url}/invite",
+          "data": {"org_id": str(org_id)},
+        },
+      )
       user_id = response.user.id
     except Exception as e:
       raise HTTPException(status_code=400, detail=f"Supabase User invitation failed: {str(e)}")
 
     try:
       new_user = models.User(
-        id=user_id,
-        email=email,
-        full_name="temp",
+        id=UUID(str(user_id)),
+        email=email.lower(),
+        full_name=_display_name_from_email(email),
         role=role,
         organization_id=org_id
       )

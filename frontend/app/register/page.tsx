@@ -180,7 +180,7 @@ export default function RegisterPage() {
       }
 
       setViewState("success");
-      window.setTimeout(() => router.push("/"), 1400);
+      window.setTimeout(() => router.push("/?invite=1"), 1400);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -384,7 +384,7 @@ export default function RegisterPage() {
               </li>
               <li className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
                 <Users className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
-                Invite engineers from the Admin console next
+                Invite teammates right after you create the workspace
               </li>
               <li className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
                 <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />

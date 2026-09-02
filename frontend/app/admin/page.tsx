@@ -17,10 +17,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Users, Activity, AlertTriangle, Settings } from "lucide-react";
+import { Users, Activity, AlertTriangle, Settings, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import EditUserModal from "../components/EditUserModal";
+import InviteUsersDialog from "../components/InviteUsersDialog";
 import UserStatsModal from "../components/UserStatsModal"; 
 import MetricsDashboard from "../components/MetricsDashboard";
 import AppHeader from "../components/AppHeader";
@@ -57,6 +58,7 @@ export default function AdminDashboard() {
   // Modal States
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<DetailedUserStat | null>(null);
 
   useEffect(() => {
@@ -177,8 +179,16 @@ export default function AdminDashboard() {
 
       <Card className="gap-0 py-0 overflow-hidden">
         <CardHeader className="border-b border-slate-200/70 dark:border-white/10 bg-white/40 dark:bg-white/5 pt-4 pb-3">
-          <CardTitle className="text-base font-semibold text-slate-800 dark:text-slate-100">Team Performance & Management</CardTitle>
-          <p className="text-sm text-slate-600 dark:text-slate-400">Click a row to view detailed individual stats.</p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <CardTitle className="text-base font-semibold text-slate-800 dark:text-slate-100">Team Performance & Management</CardTitle>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Click a row to view detailed individual stats.</p>
+            </div>
+            <Button onClick={() => setIsInviteOpen(true)} className="shrink-0">
+              <UserPlus className="h-4 w-4" />
+              Invite teammate
+            </Button>
+          </div>
         </CardHeader>
         <Table>
           <TableHeader>
@@ -250,6 +260,12 @@ export default function AdminDashboard() {
         user={selectedUser}
         isOpen={isStatsModalOpen}
         onClose={() => setIsStatsModalOpen(false)}
+      />
+
+      <InviteUsersDialog
+        isOpen={isInviteOpen}
+        onClose={() => setIsInviteOpen(false)}
+        onInvited={fetchStats}
       />
 
     </AppShell>

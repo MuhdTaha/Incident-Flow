@@ -38,6 +38,10 @@ Key technical choices and trade-offs. Useful for portfolio reviewers evaluating 
 
 **Why:** Offloads password hashing, email verification, and invite flows. Backend stays in control of authorization and tenancy.
 
+**Invites:** `POST /orgs/invite` (admin only) calls Supabase `invite_user_by_email` with `redirect_to` `{FRONTEND_URL}/invite`, then creates the local `User` in the admin’s org. Invitees never hit `/register`. Incident alerts still go through Mailjet/Celery — mixing those would duplicate email stacks and lose Supabase’s invite-token handling.
+
+**Requires:** `SUPABASE_URL` + service-role `SUPABASE_KEY`, plus `/invite` on the Supabase Auth redirect allow-list. Missing credentials return **501**.
+
 ---
 
 ## 5. Append-only audit log
@@ -104,7 +108,8 @@ Key technical choices and trade-offs. Useful for portfolio reviewers evaluating 
 
 - Analytics SQL targets Postgres features (test suite mocks some queries for SQLite)
 - No websocket / live updates (30s poll + manual refresh)
-- Invite flow requires Supabase service role key
+- Invite flow requires a valid Supabase **service role** key (`SUPABASE_KEY`); the anon key cannot send invites
+- Invite emails come from Supabase (not Mailhog). Add `http://localhost:3000/invite` to the Auth redirect allow-list
 - E2E tests need a pre-provisioned Supabase test user
 - Demo seed targets one org (`DEMO_ORG_ID`); users in other orgs will not see the catalog
 

@@ -31,6 +31,8 @@ services:
         sync: false
       - key: SUPABASE_KEY
         sync: false
+      - key: FRONTEND_URL
+        sync: false
       - key: GROQ_API_KEY
         sync: false
       - key: MAILJET_API_KEY

@@ -183,6 +183,7 @@ Week 3 — optional
 | Topic | One-liner |
 |-------|-----------|
 | Identity vs authz | JWT proves who you are; `GET /users/me` is the role/org source of truth |
+| Org invites | Supabase sends the email; Postgres binds the user to the inviting org — invitees never create a second workspace |
 | FSM | Invalid state changes rejected; covered by unit + API tests |
 | Multi-tenancy | Every query scoped by `organization_id`; cross-org → 404 |
 | Layering | Thin routes; services own transactions |

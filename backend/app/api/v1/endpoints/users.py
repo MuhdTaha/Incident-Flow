@@ -9,14 +9,28 @@ from app.services.user_service import UserService
 
 router = APIRouter()
 
+def _current_user_read(user: models.User) -> user_schemas.CurrentUserRead:
+  return user_schemas.CurrentUserRead(
+    id=user.id,
+    role=user.role,
+    org_id=user.organization_id,
+    full_name=user.full_name,
+  )
+
+
 @router.get("/me", response_model=user_schemas.CurrentUserRead)
 def get_me(current_user: models.User = Depends(get_current_user)):
-  return user_schemas.CurrentUserRead(
-    id=current_user.id,
-    role=current_user.role,
-    org_id=current_user.organization_id,
-    full_name=current_user.full_name,
-  )
+  return _current_user_read(current_user)
+
+
+@router.patch("/me", response_model=user_schemas.CurrentUserRead)
+def update_me(
+  request: user_schemas.UserUpdate,
+  current_user: models.User = Depends(get_current_user),
+  service: UserService = Depends(get_user_service),
+):
+  updated = service.update_me(current_user, request)
+  return _current_user_read(updated)
 
 @router.get("/", response_model=List[user_schemas.UserRead])
 def get_users(

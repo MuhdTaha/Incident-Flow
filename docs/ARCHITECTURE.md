@@ -20,7 +20,9 @@ High-level design of IncidentFlow for reviewers and contributors.
                     └───────────────────────────────────
 ```
 
-**Auth flow:** Supabase handles sign-up/login. The frontend sends the Supabase JWT as `Authorization: Bearer`. The API validates the token, loads the user from Postgres (`GET /users/me`), and scopes all queries to `organization_id`. UI role gates (Admin console, manager edit/delete) use the Postgres role, not JWT `app_metadata`.
+**Auth flow:** Supabase handles sign-up, login, and **org invites**. The frontend sends the Supabase JWT as `Authorization: Bearer`. The API validates the token, loads the user from Postgres (`GET /users/me`), and scopes all queries to `organization_id`. UI role gates (Admin console, manager edit/delete) use the Postgres role, not JWT `app_metadata`.
+
+**Org invites:** An admin calls `POST /orgs/invite`. The API uses the Supabase service-role key to `invite_user_by_email` (`redirect_to` `{FRONTEND_URL}/invite`) and inserts a `User` row in the admin’s org. The invitee sets a password on `/invite` and patches `full_name` via `PATCH /users/me`. Incident alert email stays on Mailjet/Celery; invite email stays on Supabase Auth.
 
 ## Backend layers
 
@@ -91,10 +93,11 @@ Attachments and post-mortems are **not** stored in Postgres:
 
 | Route | Purpose |
 |-------|---------|
-| `/` | Incident dashboard (list, filter, actions) |
-| `/admin` | Analytics and user metrics (admin only) |
+| `/` | Incident dashboard (list, filter, actions); `?invite=1` opens the invite dialog for admins |
+| `/admin` | Analytics, user metrics, **Invite teammate** (admin only) |
 | `/postmortem/[id]` | View / generate AI post-mortem |
 | `/login`, `/register` | Supabase auth + org onboarding |
+| `/invite` | Invitee sets name + password and joins the existing org |
 
 State: `AuthContext` holds the Supabase session (identity). `UserContext` loads `GET /users/me` for `{ id, role, org_id, full_name }` and the org user directory. Dashboard polls `GET /incidents` every 30s (not realtime).
 

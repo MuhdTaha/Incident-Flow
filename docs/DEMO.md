@@ -26,7 +26,7 @@ IncidentFlow is a multi-tenant incident manager. Teams declare production issues
 Capture these three after the live app is up (dashboard, admin analytics, post-mortem) and drop them in `docs/screenshots/`:
 
 1. **Dashboard** — queue + filters + **Last updated** (not a live badge)
-2. **Admin console** — charts + team table (Admin link only when role is `ADMIN`)
+2. **Admin console** — charts + team table + **Invite teammate** (Admin link only when role is `ADMIN`)
 3. **Post-mortem** — generated markdown for a resolved incident
 
 ```
@@ -57,7 +57,8 @@ docs/screenshots/postmortem.png
 1. Sign out → sign in as **Alex**.
 2. Open **Admin Console** (visible because `GET /users/me` returned `ADMIN`).
 3. Show performance charts (MTTR / volume) and the team table (assigned / resolved).
-4. Talking point: *this page 403s for non-admins on the API; the UI hides the link from engineers so we don’t fake access.*
+4. Point at **Invite teammate** (do not send a live invite unless you intend to). Talking point: *after org create the same dialog opens on `/?invite=1`. `POST /orgs/invite` is admin-only; Supabase emails the link, our DB attaches the user to this org.*
+5. Talking point: *this page 403s for non-admins on the API; the UI hides the link from engineers so we don’t fake access.*
 
 ### 4. Post-mortem (≈1.5 min)
 

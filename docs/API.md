@@ -36,9 +36,11 @@ The API resolves the user from Postgres and enforces `organization_id` on every 
 |--------|------|------|-------------|
 | GET | `/orgs/org_profile` | Yes | Current org profile |
 | POST | `/orgs/register` | JWT only* | Create org + admin user after Supabase signup |
-| POST | `/orgs/invite` | Admin | Invite user via Supabase email |
+| POST | `/orgs/invite` | Admin | Invite user via Supabase email (`redirect_to` `/invite`) |
 
 \* Uses token claims only — user row may not exist yet.
+
+Invite body: `{ "email": "alex@company.com", "role": "ENGINEER" }`. `role` is `ENGINEER` (default), `MANAGER`, or `ADMIN`. Duplicate emails return **409**. Missing Supabase service-role credentials return **501**. The invite email links to `{FRONTEND_URL}/invite` so the teammate can set a password and join this org.
 
 ### Incidents — `/incidents`
 
@@ -68,6 +70,7 @@ The API resolves the user from Postgres and enforces `organization_id` on every 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | GET | `/users/me` | Yes | Current user `{ id, role, org_id, full_name }` from Postgres (not JWT `app_metadata`) |
+| PATCH | `/users/me` | Yes | Update own `full_name` / `phone_number` (role changes are ignored) |
 | GET | `/users` | Yes | List org users |
 | PATCH | `/users/{id}/role` | Admin | Change role |
 | DELETE | `/users/{id}` | Admin | Remove user |
@@ -87,6 +90,25 @@ The API resolves the user from Postgres and enforces `organization_id` on every 
 | 403 | Authenticated but wrong role |
 | 404 | Resource not found (includes cross-org access) |
 | 400 | Invalid FSM transition or business rule violation |
+| 409 | Duplicate email (org invite) |
+
+## Example: invite a teammate (admin)
+
+```bash
+curl -X POST http://localhost:8000/api/v1/orgs/invite \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "alex@company.com", "role": "ENGINEER"}'
+```
+
+The invitee opens `{FRONTEND_URL}/invite`, sets a password, then:
+
+```bash
+curl -X PATCH http://localhost:8000/api/v1/users/me \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"full_name": "Alex Rivera"}'
+```
 
 ## Example: create incident
 

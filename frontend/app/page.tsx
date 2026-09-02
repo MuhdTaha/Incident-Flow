@@ -27,9 +27,10 @@ import IncidentStats from "./components/IncidentStats";
 import { IncidentFilters, FilterState } from "./components/IncidentFilters";
 import { getSevStyles, getStatusIcon } from "@/lib/incident-utils";
 import { useAuth } from "@/context/AuthContext";
-import { useUserDirectory } from "@/context/UserContext";
+import { useCurrentUser, useUserDirectory } from "@/context/UserContext";
 import { authFetch } from "@/lib/api";
 import { useIncidentPoll } from "@/hooks/useIncidentPoll";
+import InviteUsersDialog from "./components/InviteUsersDialog";
 
 type Incident = {
   id: string;
@@ -46,13 +47,15 @@ type Incident = {
 export default function IncidentDashboard() {
   const router = useRouter();
   const { user } = useAuth();
-  const { userMap } = useUserDirectory();
+  const { userMap, refreshUsers } = useUserDirectory();
+  const { isAdmin, loading: profileLoading } = useCurrentUser();
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
 
   const [actionIncident, setActionIncident] = useState<Incident | null>(null);
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   const [filters, setFilters] = useState<FilterState>({
     severities: [],
@@ -67,6 +70,14 @@ export default function IncidentDashboard() {
       router.push("/login");
     }
   }, [user, router]);
+
+  useEffect(() => {
+    if (profileLoading) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("invite") !== "1") return;
+    if (isAdmin) setInviteOpen(true);
+    router.replace("/");
+  }, [profileLoading, isAdmin, router]);
 
   const fetchIncidents = useCallback(async () => {
     setLoading(true);
@@ -246,6 +257,12 @@ export default function IncidentDashboard() {
           void refresh();
           setSelectedIncidentId(actionIncident ? actionIncident.id : null);
         }}
+      />
+
+      <InviteUsersDialog
+        isOpen={inviteOpen}
+        onClose={() => setInviteOpen(false)}
+        onInvited={refreshUsers}
       />
     </AppShell>
   );

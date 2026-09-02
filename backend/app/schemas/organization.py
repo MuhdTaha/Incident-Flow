@@ -3,6 +3,7 @@ from uuid import UUID
 from datetime import datetime
 from typing import Optional
 
+from app.db.models import UserRole
 from app.schemas.common import OrgProfile
 from app.schemas.user import UserRead
 
@@ -15,7 +16,7 @@ class OrgRegistrationResponse(BaseModel):
 
 class InviteRequest(BaseModel):
   email: EmailStr
-  role: str = "ENGINEER"
+  role: UserRole = UserRole.ENGINEER
   
 class InviteResponse(BaseModel):
   message: str

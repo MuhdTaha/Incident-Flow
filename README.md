@@ -29,6 +29,7 @@ Please don’t delete seeded catalog incidents or change demo-user roles — Cel
 - **Finite state machine** — invalid incident transitions are rejected at the service layer
 - **Org-scoped multi-tenancy** — every query is filtered by `organization_id`; cross-org access returns 404
 - **RBAC** — Engineer / Manager / Admin from Postgres (`GET /users/me`), not JWT `app_metadata`
+- **Org invites** — after workspace create (and from Admin), invite by email; teammates join that org via `/invite`
 - **Immutable audit log** — status, owner, comment, and attachment events in the same transaction as the change
 - **Background jobs** — Celery for email, SLA auto-escalation, and demo-data refresh
 - **Presigned uploads** — files go to object storage; the API stores metadata only
@@ -100,7 +101,7 @@ Incident-Flow/
 ├── backend/          # FastAPI API, services, repositories, Celery tasks
 │   ├── scripts/      # Demo seed CLI (python -m scripts.seed_demo)
 │   └── render.yaml   # Render: API + Redis + worker + beat
-├── frontend/         # Next.js app (dashboard, admin, post-mortem)
+├── frontend/         # Next.js app (dashboard, admin, invite, post-mortem)
 ├── docs/             # Architecture, setup, API, design notes, demo script
 ├── .github/workflows # CI + scheduled demo-seed refresh
 ├── docker-compose.yml

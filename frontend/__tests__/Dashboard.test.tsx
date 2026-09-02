@@ -25,6 +25,7 @@ jest.mock('@/lib/api', () => ({
 // Sometimes UserNav or Stats cards are too complex for a page test. 
 // You can mock them to simplify the test.
 jest.mock('@/app/components/UserNav', () => () => <div data-testid="user-nav">UserNav</div>)
+jest.mock('@/app/components/InviteUsersDialog', () => () => null)
 jest.mock('@/context/AuthContext', () => ({
   useAuth: () => ({ user: { id: 'user-1' } }),
 }))
