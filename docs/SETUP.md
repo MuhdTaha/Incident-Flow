@@ -142,6 +142,17 @@ That creates login-able demo users (Jordan / Sarah / Alex), aligns their Postgre
 
 For the GitHub cron backup: **Settings → Secrets → Actions** → add `DATABASE_URL` matching the Render/Supabase database.
 
+CI Playwright (`ci.yml`) needs:
+
+| Secret | Purpose |
+|--------|---------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Same project as the app |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | Anon / publishable key |
+| `E2E_USER_EMAIL` / `E2E_USER_PASSWORD` | Confirmed Auth user that already has a Postgres `users` row |
+| `SUPABASE_KEY` | Secret / service_role key so CI can reset that user’s password if Auth is in invite-only state |
+
+`frontend/scripts/ensure-e2e-user.mjs` runs before Playwright. Invited users with no password fail as **Invalid login credentials**; the script confirms the email and sets the secret password when `SUPABASE_KEY` is present.
+
 ## 6. Run tests
 
 ```bash
@@ -178,4 +189,4 @@ make clean           # stop + remove volumes (wipes DB)
 | Invite returns 501 mentioning publishable/anon | You pasted the frontend anon key. Use **secret** (`sb_secret_…` or legacy `service_role` JWT) |
 | Invite email link lands on the wrong page | Add `https://<vercel-app>/invite` and `http://localhost:3000/invite` to Supabase Auth **Redirect URLs**; set `FRONTEND_URL` on the API to the Vercel origin (e.g. `https://incident-flow-nine.vercel.app`) |
 | Invite email never arrives | Production needs `MAILJET_*` on the API. Locally, open Mailhog at http://localhost:8025 — invites are sent over SMTP, not through Supabase’s mailer. |
-| Invite returns `email_exists` after removing a teammate | Removing a user now deletes their Auth login. Until this build is deployed, delete the user under Supabase → Authentication → Users. |
+| E2E sign-in failed: Invalid login credentials | The Auth user is missing, unconfirmed, or invite-only. Use a confirmed user (not a pending invite). In CI add `SUPABASE_KEY` so `ensure-e2e-user.mjs` can reset the password. |

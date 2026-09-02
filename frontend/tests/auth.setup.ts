@@ -28,7 +28,9 @@ setup('authenticate', async ({ page, context }) => {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
-    throw new Error(`E2E sign-in failed: ${error.message}`);
+    throw new Error(
+      `E2E sign-in failed: ${error.message}. Use a confirmed Auth user (not a pending invite). In CI, set SUPABASE_KEY so scripts/ensure-e2e-user.mjs can reset the password.`,
+    );
   }
   if (!data.session) {
     throw new Error('E2E sign-in succeeded but returned no session');

@@ -110,7 +110,7 @@ Key technical choices and trade-offs. Useful for portfolio reviewers evaluating 
 - No websocket / live updates (30s poll + manual refresh)
 - Invite flow requires a valid Supabase **secret / service_role** key (`SUPABASE_KEY`); `sb_publishable_` / anon keys cannot send invites
 - Invite emails go through Mailhog locally (`http://localhost:8025`) and Mailjet in production. Add `/invite` to the Auth redirect allow-list; set `FRONTEND_URL` on Render to the Vercel origin
-- E2E tests need a pre-provisioned Supabase test user
+- E2E tests need a pre-provisioned, **confirmed** Supabase user (pending invites cannot sign in). CI resets that user when `SUPABASE_KEY` is set
 - Demo seed targets one org (`DEMO_ORG_ID`); users in other orgs will not see the catalog
 
 These are documented intentionally — they show awareness of production gaps without over-scoping the capstone.
