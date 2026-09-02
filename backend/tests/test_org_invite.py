@@ -94,17 +94,24 @@ def test_invite_success_creates_local_user(client, db, monkeypatch):
   admin = _create_user(db, org.id, UserRole.ADMIN, "admin-success@invite.com")
   invited_id = uuid.uuid4()
   captured = {}
+  sent = {}
 
-  def fake_invite(email, redirect_to, user_metadata=None):
+  def fake_generate(email, redirect_to, user_metadata=None):
     captured["email"] = email
     captured["redirect_to"] = redirect_to
     captured["user_metadata"] = user_metadata
-    return str(invited_id)
+    return str(invited_id), "https://example.supabase.co/auth/v1/verify?token=abc&type=invite"
+
+  def fake_send(to_email, org_name, invite_url):
+    sent["to_email"] = to_email
+    sent["org_name"] = org_name
+    sent["invite_url"] = invite_url
 
   monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
   monkeypatch.setenv("SUPABASE_KEY", "sb_secret_testkey")
   monkeypatch.setenv("FRONTEND_URL", "http://localhost:3000")
-  monkeypatch.setattr("app.services.org_service.invite_user_by_email", fake_invite)
+  monkeypatch.setattr("app.services.org_service.generate_invite_link", fake_generate)
+  monkeypatch.setattr("app.services.org_service.send_org_invite_email", fake_send)
 
   app.dependency_overrides[get_current_user] = lambda: admin
   response = client.post(
@@ -118,12 +125,16 @@ def test_invite_success_creates_local_user(client, db, monkeypatch):
   assert "jordan.lee@company.com" in data["message"].lower()
   assert captured["redirect_to"] == "http://localhost:3000/invite"
   assert captured["user_metadata"]["org_id"] == str(org.id)
+  assert sent["to_email"] == "jordan.lee@company.com"
+  assert sent["org_name"] == "Success Org"
+  assert "type=invite" in sent["invite_url"]
 
   created = db.query(User).filter(User.id == invited_id).first()
   assert created is not None
   assert created.email == "jordan.lee@company.com"
   assert created.full_name == "Jordan Lee"
   assert created.role == UserRole.MANAGER
+  assert created.invite_pending is True
   assert created.organization_id == org.id
   app.dependency_overrides.pop(get_current_user, None)
 
@@ -161,26 +172,32 @@ def test_invite_501_when_anon_key(client, db, monkeypatch):
   app.dependency_overrides.pop(get_current_user, None)
 
 
-def test_invite_attaches_existing_auth_user(client, db, monkeypatch):
-  org = _create_org(db, "Attach Org", "attach-org")
-  admin = _create_user(db, org.id, UserRole.ADMIN, "admin-attach@invite.com")
-  auth_id = uuid.uuid4()
-  sent = {}
+def test_invite_reinvites_orphaned_auth_user(client, db, monkeypatch):
+  org = _create_org(db, "Reinvite Org", "reinvite-org")
+  admin = _create_user(db, org.id, UserRole.ADMIN, "admin-reinvite@invite.com")
+  leftover_auth_id = uuid.uuid4()
+  fresh_auth_id = uuid.uuid4()
+  invite_calls = []
+  deleted = []
+  sent = []
 
-  def fake_invite(email, redirect_to, user_metadata=None):
-    raise EmailAlreadyRegistered(email)
-
-  def fake_lookup(email):
-    return str(auth_id)
-
-  def fake_link(email, redirect_to):
-    sent["email"] = email
-    sent["redirect_to"] = redirect_to
+  def fake_generate(email, redirect_to, user_metadata=None):
+    invite_calls.append(email)
+    if len(invite_calls) == 1:
+      raise EmailAlreadyRegistered(email)
+    return str(fresh_auth_id), "https://example.supabase.co/auth/v1/verify?token=fresh&type=invite"
 
   monkeypatch.setenv("FRONTEND_URL", "https://app.example")
-  monkeypatch.setattr("app.services.org_service.invite_user_by_email", fake_invite)
-  monkeypatch.setattr("app.services.org_service.get_auth_user_id_by_email", fake_lookup)
-  monkeypatch.setattr("app.services.org_service.send_login_link", fake_link)
+  monkeypatch.setattr("app.services.org_service.generate_invite_link", fake_generate)
+  monkeypatch.setattr("app.services.org_service.send_org_invite_email", lambda *args: sent.append(args))
+  monkeypatch.setattr(
+    "app.services.org_service.get_auth_user_id_by_email",
+    lambda email: str(leftover_auth_id),
+  )
+  monkeypatch.setattr(
+    "app.services.org_service.delete_auth_user",
+    lambda user_id: deleted.append(user_id),
+  )
 
   app.dependency_overrides[get_current_user] = lambda: admin
   response = client.post(
@@ -189,12 +206,14 @@ def test_invite_attaches_existing_auth_user(client, db, monkeypatch):
   )
 
   assert response.status_code == 200
-  assert response.json()["user_id"] == str(auth_id)
-  assert sent["email"] == "existing.user@company.com"
-  assert sent["redirect_to"] == "https://app.example/invite"
+  assert response.json()["user_id"] == str(fresh_auth_id)
+  assert deleted == [str(leftover_auth_id)]
+  assert len(invite_calls) == 2
+  assert sent
 
-  created = db.query(User).filter(User.id == auth_id).first()
+  created = db.query(User).filter(User.id == fresh_auth_id).first()
   assert created is not None
   assert created.organization_id == org.id
   assert created.email == "existing.user@company.com"
+  assert created.invite_pending is True
   app.dependency_overrides.pop(get_current_user, None)

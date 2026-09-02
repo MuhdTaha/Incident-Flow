@@ -11,7 +11,8 @@ class AnalyticsRepository:
   def get_total_users(self, org_id: UUID) -> int:
     return self.db.query(models.User).filter(
       models.User.role != models.UserRole.BOT, 
-      models.User.organization_id == org_id
+      models.User.organization_id == org_id,
+      models.User.invite_pending.is_(False),
     ).count()
 
   def get_total_incidents(self, org_id: UUID) -> int:
@@ -122,7 +123,7 @@ class AnalyticsRepository:
     """
     query = text("""
       SELECT
-        u.id, u.full_name, u.email, u.role,
+        u.id, u.full_name, u.email, u.role, u.invite_pending,
         COUNT(DISTINCT i.id) as assigned_incidents,
         COUNT(DISTINCT CASE WHEN i.status = 'RESOLVED' THEN i.id END) as resolved_incidents,
         COUNT(DISTINCT CASE WHEN ie.event_type = 'COMMENT' THEN i.id END) as comments_made, 
@@ -133,7 +134,7 @@ class AnalyticsRepository:
       LEFT JOIN incident_events ie ON u.id = ie.actor_id
       WHERE u.organization_id = :org_id
       AND u.role != 'BOT'
-      GROUP BY u.id, u.full_name, u.email, u.role
+      GROUP BY u.id, u.full_name, u.email, u.role, u.invite_pending
     """)
     return self.db.execute(query, {"org_id": str(org_id)}).fetchall()
   

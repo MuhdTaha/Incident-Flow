@@ -27,7 +27,7 @@ cp frontend/.env.example frontend/.env
 | `SUPABASE_KEY` | For invites | Supabase service role key |
 | `FRONTEND_URL` | For invites | App origin used in invite emails. Local default: `http://localhost:3000` |
 | `GROQ_API_KEY` | For AI post-mortems | Groq API key |
-| `MAILJET_*` | Optional | Production email alerts (Mailhog used locally) |
+| `MAILJET_*` | Optional | Production invite + alert email. Local Docker uses Mailhog (`SMTP_HOST`) even if these are set. |
 | `S3_*` | Optional | Defaults work with bundled MinIO |
 | `DEMO_ORG_ID` | Optional | Org UUID for demo seed (defaults to Default Org `00000000-0000-0000-0000-000000000111`) |
 
@@ -177,3 +177,5 @@ make clean           # stop + remove volumes (wipes DB)
 | Invite returns 501 / “Supabase credentials not configured” | Set `SUPABASE_URL` and the **secret / service_role** `SUPABASE_KEY` on the **Render API** service (not the anon/`sb_publishable_` key). Redeploy after saving. |
 | Invite returns 501 mentioning publishable/anon | You pasted the frontend anon key. Use **secret** (`sb_secret_…` or legacy `service_role` JWT) |
 | Invite email link lands on the wrong page | Add `https://<vercel-app>/invite` and `http://localhost:3000/invite` to Supabase Auth **Redirect URLs**; set `FRONTEND_URL` on the API to the Vercel origin (e.g. `https://incident-flow-nine.vercel.app`) |
+| Invite email never arrives | Production needs `MAILJET_*` on the API. Locally, open Mailhog at http://localhost:8025 — invites are sent over SMTP, not through Supabase’s mailer. |
+| Invite returns `email_exists` after removing a teammate | Removing a user now deletes their Auth login. Until this build is deployed, delete the user under Supabase → Authentication → Users. |

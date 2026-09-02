@@ -17,6 +17,7 @@ class DetailedUserStats(BaseModel):
   comments_made: int = 0
   breached_incidents: int = 0
   escalations_triggered: int = 0
+  invite_pending: bool = False
 
 class AdminDashboardStats(BaseModel):
   total_users: int

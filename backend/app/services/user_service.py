@@ -3,6 +3,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from app.schemas import user as schemas
 from app.repositories.user_repo import UserRepository
+from app.core.supabase_admin import delete_auth_user
 
 class UserService:
   def __init__(self, db: Session):
@@ -23,6 +24,8 @@ class UserService:
       user.full_name = name
     if update.phone_number is not None:
       user.phone_number = update.phone_number
+    if user.invite_pending:
+      user.invite_pending = False
     self.repo.flush()
     self.repo.refresh(user)
     self._commit()
@@ -50,5 +53,11 @@ class UserService:
     if not user:
       raise HTTPException(status_code=404, detail="User not found")
 
+    auth_id = str(user.id)
     self.repo.delete_entity(user)
     self._commit()
+    try:
+      delete_auth_user(auth_id)
+    except RuntimeError:
+      # Local row is already gone. A leftover Auth login is cleaned up on re-invite.
+      pass

@@ -5,6 +5,7 @@ import pytest
 
 from app.core.supabase_admin import (
   EmailAlreadyRegistered,
+  delete_auth_user,
   invite_user_by_email,
   supabase_admin_config,
 )
@@ -38,6 +39,38 @@ def test_invite_posts_to_gotrue(monkeypatch):
   assert captured["url"] == "https://abc.supabase.co/auth/v1/invite"
   assert captured["json"]["redirect_to"] == "https://app.example/invite"
   assert captured["headers"]["apikey"] == "sb_secret_testkey"
+
+
+def test_generate_invite_link_returns_action_link(monkeypatch):
+  invited_id = str(uuid.uuid4())
+  captured = {}
+
+  def fake_post(url, headers=None, json=None, timeout=None):
+    captured["url"] = url
+    captured["json"] = json
+    response = Mock()
+    response.status_code = 200
+    response.content = b"{}"
+    response.json.return_value = {
+      "action_link": "https://abc.supabase.co/auth/v1/verify?token=xyz&type=invite",
+      "user": {"id": invited_id, "email": json["email"]},
+    }
+    return response
+
+  monkeypatch.setenv("SUPABASE_URL", "https://abc.supabase.co")
+  monkeypatch.setenv("SUPABASE_KEY", "sb_secret_testkey")
+  monkeypatch.setattr("app.core.supabase_admin.httpx.post", fake_post)
+
+  from app.core.supabase_admin import generate_invite_link
+  user_id, link = generate_invite_link(
+    "alex@company.com",
+    redirect_to="https://app.example/invite",
+    user_metadata={"org_id": "org-1"},
+  )
+  assert user_id == invited_id
+  assert "type=invite" in link
+  assert captured["url"] == "https://abc.supabase.co/auth/v1/admin/generate_link"
+  assert captured["json"]["type"] == "invite"
 
 
 def test_invite_reads_nested_user_id(monkeypatch):
@@ -94,6 +127,26 @@ def test_invite_422_email_exists_is_typed(monkeypatch):
 
   with pytest.raises(EmailAlreadyRegistered):
     invite_user_by_email("taken@company.com", "http://localhost:3000/invite")
+
+
+def test_delete_auth_user_treats_404_as_success(monkeypatch):
+  captured = {}
+
+  def fake_delete(url, headers=None, timeout=None):
+    captured["url"] = url
+    response = Mock()
+    response.status_code = 404
+    response.content = b""
+    response.text = "not found"
+    response.reason_phrase = "Not Found"
+    return response
+
+  monkeypatch.setenv("SUPABASE_URL", "https://abc.supabase.co")
+  monkeypatch.setenv("SUPABASE_KEY", "sb_secret_testkey")
+  monkeypatch.setattr("app.core.supabase_admin.httpx.delete", fake_delete)
+
+  delete_auth_user("user-123")
+  assert captured["url"] == "https://abc.supabase.co/auth/v1/admin/users/user-123"
 
 
 def test_config_message_is_generic():

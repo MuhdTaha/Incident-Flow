@@ -26,7 +26,8 @@ class UserRepository:
   def list_all(self, org_id: UUID) -> List[User]:
     return self.db.query(User).filter(
       User.organization_id == org_id,
-      User.role != UserRole.BOT
+      User.role != UserRole.BOT,
+      User.invite_pending.is_(False),
     ).all()
 
   def add(self, user: User) -> User:

@@ -22,7 +22,7 @@ High-level design of IncidentFlow for reviewers and contributors.
 
 **Auth flow:** Supabase handles sign-up, login, and **org invites**. The frontend sends the Supabase JWT as `Authorization: Bearer`. The API validates the token, loads the user from Postgres (`GET /users/me`), and scopes all queries to `organization_id`. UI role gates (Admin console, manager edit/delete) use the Postgres role, not JWT `app_metadata`.
 
-**Org invites:** An admin calls `POST /orgs/invite`. The API uses the Supabase service-role key to `invite_user_by_email` (`redirect_to` `{FRONTEND_URL}/invite`) and inserts a `User` row in the admin’s org. The invitee sets a password on `/invite` and patches `full_name` via `PATCH /users/me`. Incident alert email stays on Mailjet/Celery; invite email stays on Supabase Auth.
+**Org invites:** An admin calls `POST /orgs/invite`. The API asks GoTrue for an invite `action_link` (`generate_link`, `redirect_to` `{FRONTEND_URL}/invite`), emails that link via Mailjet or local SMTP/Mailhog, and inserts a **pending** `User` row. They are hidden from assignee lists and counted separately until they complete `/invite`. Removing a teammate also deletes their Auth login. Incident alert email stays on Mailjet/Celery.
 
 ## Backend layers
 

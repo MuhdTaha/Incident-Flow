@@ -2,7 +2,7 @@
 
 from os import name
 import uuid
-from sqlalchemy import Column, String, ForeignKey, DateTime, UUID, Enum as SQLEnum, Text
+from sqlalchemy import Column, String, ForeignKey, DateTime, UUID, Enum as SQLEnum, Text, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.db.session import Base
@@ -53,6 +53,7 @@ class User(Base):
   role = Column(SQLEnum(UserRole, name="user_role"), default=UserRole.ENGINEER, nullable=False)
   created_at = Column(DateTime(timezone=True), server_default=func.now())
   phone_number = Column(String, nullable=True)
+  invite_pending = Column(Boolean, nullable=False, default=False)
   organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False)
 
   # Relationships

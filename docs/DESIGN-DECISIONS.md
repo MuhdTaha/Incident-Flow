@@ -38,9 +38,9 @@ Key technical choices and trade-offs. Useful for portfolio reviewers evaluating 
 
 **Why:** Offloads password hashing, email verification, and invite flows. Backend stays in control of authorization and tenancy.
 
-**Invites:** `POST /orgs/invite` (admin only) calls Supabase `invite_user_by_email` with `redirect_to` `{FRONTEND_URL}/invite`, then creates the local `User` in the admin’s org. Invitees never hit `/register`. Incident alerts still go through Mailjet/Celery — mixing those would duplicate email stacks and lose Supabase’s invite-token handling.
+**Invites:** The API generates a GoTrue invite `action_link` and emails it via Mailjet (production) or SMTP/Mailhog (local). supabase-py 2.6 cannot send invites with modern `sb_secret_` keys, and Supabase’s built-in mailer is easy to miss (rate limits / spam). The local `User` row is `invite_pending` until they complete `/invite`.
 
-**Requires:** `SUPABASE_URL` + secret/`service_role` `SUPABASE_KEY` (`sb_secret_…` or a legacy JWT — not the publishable anon key), plus `/invite` on the Supabase Auth redirect allow-list. Invites call GoTrue `POST /auth/v1/invite` directly because supabase-py 2.6 rejects modern `sb_secret_` keys. Missing or anon credentials return **501**.
+**Requires:** `SUPABASE_URL` + secret/`service_role` `SUPABASE_KEY` (`sb_secret_…` or a legacy JWT — not the publishable anon key), `/invite` on the Supabase Auth redirect allow-list, and `FRONTEND_URL`. Local Docker sends via Mailhog even if `MAILJET_*` is in `.env`. Missing credentials return **501**; email send failure returns **502**.
 
 ---
 
@@ -109,7 +109,7 @@ Key technical choices and trade-offs. Useful for portfolio reviewers evaluating 
 - Analytics SQL targets Postgres features (test suite mocks some queries for SQLite)
 - No websocket / live updates (30s poll + manual refresh)
 - Invite flow requires a valid Supabase **secret / service_role** key (`SUPABASE_KEY`); `sb_publishable_` / anon keys cannot send invites
-- Invite emails come from Supabase (not Mailhog). Add `/invite` to the Auth redirect allow-list; set `FRONTEND_URL` on Render to the Vercel origin
+- Invite emails go through Mailhog locally (`http://localhost:8025`) and Mailjet in production. Add `/invite` to the Auth redirect allow-list; set `FRONTEND_URL` on Render to the Vercel origin
 - E2E tests need a pre-provisioned Supabase test user
 - Demo seed targets one org (`DEMO_ORG_ID`); users in other orgs will not see the catalog
 

@@ -32,7 +32,8 @@ class AnalyticsService:
         resolved_count=row.resolved_incidents,
         comments_made=row.comments_made,
         breached_incidents=row.breached_incidents,
-        escalations_triggered=row.escalations_triggered   
+        escalations_triggered=row.escalations_triggered,
+        invite_pending=bool(getattr(row, "invite_pending", False)),
       ) for row in raw_users
     ]
         

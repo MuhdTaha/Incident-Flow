@@ -92,7 +92,7 @@ export default function InviteUsersDialog({
             Invite teammates
           </DialogTitle>
           <DialogDescription>
-            Send an email invite so they can create an account in this workspace.
+            Send an email with a link to create their account. They won’t appear as an active teammate until they join.
           </DialogDescription>
         </DialogHeader>
 
@@ -100,7 +100,7 @@ export default function InviteUsersDialog({
           {lastInvited && (
             <div className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
               <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>Invite sent to {lastInvited}. You can add another email.</span>
+              <span>Invite sent to {lastInvited}. They stay pending until they join from the email.</span>
             </div>
           )}
 

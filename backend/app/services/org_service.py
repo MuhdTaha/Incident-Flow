@@ -8,10 +8,11 @@ from app.db import models
 from app.repositories.user_repo import UserRepository
 from app.core.supabase_admin import (
   EmailAlreadyRegistered,
+  delete_auth_user,
+  generate_invite_link,
   get_auth_user_id_by_email,
-  invite_user_by_email,
-  send_login_link,
 )
+from app.core.invite_email import send_org_invite_email
 
 INVITABLE_ROLES = {
   models.UserRole.ENGINEER,
@@ -96,23 +97,37 @@ class OrganizationService:
       detail="This email already belongs to another organization. Each account can only join one workspace.",
     )
 
-  def _auth_user_for_existing_email(self, email: str, org_id: UUID) -> str:
-    """Auth already has this email. Attach an orphaned account, or reject a second org."""
+  def _http_status_for_supabase_error(self, message: str) -> int:
+    lowered = message.lower()
+    if any(token in lowered for token in ("required", "publishable", "placeholder", "anon")):
+      return 501
+    return 400
+
+  def _invite_via_supabase(self, email: str, org_id: UUID) -> tuple[str, str]:
+    return generate_invite_link(
+      email,
+      redirect_to=f"{self.frontend_url}/invite",
+      user_metadata={"org_id": str(org_id)},
+    )
+
+  def _reinvite_orphaned_auth_user(self, email: str, org_id: UUID) -> tuple[str, str]:
+    """Auth still has this email after a local delete. Remove the leftover login and invite again."""
     existing = self.repo.get_by_email(email)
     self._raise_if_email_taken(existing, org_id)
 
-    user_id = get_auth_user_id_by_email(email)
-    if not user_id:
+    auth_id = get_auth_user_id_by_email(email)
+    if auth_id:
+      existing_by_id = self.repo.get_by_id_global(UUID(str(auth_id)))
+      self._raise_if_email_taken(existing_by_id, org_id)
+      delete_auth_user(auth_id)
+
+    try:
+      return self._invite_via_supabase(email, org_id)
+    except EmailAlreadyRegistered as e:
       raise HTTPException(
         status_code=409,
-        detail="This email is already registered. Ask them to sign in, or use a different address.",
-      )
-
-    existing_by_id = self.repo.get_by_id_global(UUID(str(user_id)))
-    self._raise_if_email_taken(existing_by_id, org_id)
-
-    send_login_link(email, f"{self.frontend_url}/invite")
-    return user_id
+        detail="This email is still registered in Auth. Delete it in the Supabase dashboard, then invite again.",
+      ) from e
 
   def invite_user(self, email: str, role: models.UserRole, org_id: UUID):
     if role not in INVITABLE_ROLES:
@@ -122,30 +137,35 @@ class OrganizationService:
     self._raise_if_email_taken(self.repo.get_by_email(email), org_id)
 
     try:
-      user_id = invite_user_by_email(
-        email,
-        redirect_to=f"{self.frontend_url}/invite",
-        user_metadata={"org_id": str(org_id)},
-      )
+      user_id, action_link = self._invite_via_supabase(email, org_id)
     except EmailAlreadyRegistered:
       try:
-        user_id = self._auth_user_for_existing_email(email, org_id)
+        user_id, action_link = self._reinvite_orphaned_auth_user(email, org_id)
+      except HTTPException:
+        raise
       except RuntimeError as e:
-        message = str(e)
-        lowered = message.lower()
-        status = 501 if any(
-          token in lowered
-          for token in ("required", "publishable", "placeholder", "anon")
-        ) else 400
-        raise HTTPException(status_code=status, detail=message) from e
+        raise HTTPException(
+          status_code=self._http_status_for_supabase_error(str(e)),
+          detail=str(e),
+        ) from e
     except RuntimeError as e:
-      message = str(e)
-      lowered = message.lower()
-      status = 501 if any(
-        token in lowered
-        for token in ("required", "publishable", "placeholder", "anon")
-      ) else 400
-      raise HTTPException(status_code=status, detail=message) from e
+      raise HTTPException(
+        status_code=self._http_status_for_supabase_error(str(e)),
+        detail=str(e),
+      ) from e
+
+    org = self.get_org(org_id)
+    try:
+      send_org_invite_email(email, org.name or "IncidentFlow", action_link)
+    except Exception as e:
+      try:
+        delete_auth_user(str(user_id))
+      except RuntimeError:
+        pass
+      raise HTTPException(
+        status_code=502,
+        detail=f"Invite user was created but the email could not be sent: {e}",
+      ) from e
 
     try:
       new_user = models.User(
@@ -153,6 +173,7 @@ class OrganizationService:
         email=email.lower(),
         full_name=_display_name_from_email(email),
         role=role,
+        invite_pending=True,
         organization_id=org_id
       )
       self.repo.add(new_user)

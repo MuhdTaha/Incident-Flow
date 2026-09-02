@@ -60,6 +60,56 @@ def _json_body(response: httpx.Response) -> dict:
   return data if isinstance(data, dict) else {}
 
 
+def generate_invite_link(
+  email: str,
+  redirect_to: str,
+  user_metadata: Optional[dict] = None,
+) -> Tuple[str, str]:
+  """
+  Create (or refresh) an Auth invite via GoTrue generate_link.
+  Returns (user_id, action_link). Does not send email.
+  """
+  base, headers = supabase_admin_config(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
+  payload = {
+    "type": "invite",
+    "email": email,
+    "data": user_metadata or {},
+    "redirect_to": redirect_to,
+  }
+  try:
+    response = httpx.post(
+      f"{base}/auth/v1/admin/generate_link",
+      headers=headers,
+      json=payload,
+      timeout=30,
+    )
+  except httpx.HTTPError as exc:
+    raise RuntimeError(f"Supabase generate-link request failed: {exc}") from exc
+
+  if response.status_code == 422:
+    body = _json_body(response)
+    code = str(body.get("error_code") or body.get("code") or "").lower()
+    text = (response.text or "").lower()
+    if code == "email_exists" or "email_exists" in text or "already been registered" in text:
+      raise EmailAlreadyRegistered(email)
+
+  _raise_for_status(response, "generate invite link")
+
+  data = _json_body(response)
+  properties = data.get("properties") if isinstance(data.get("properties"), dict) else data
+  action_link = (
+    (properties or {}).get("action_link")
+    or (properties or {}).get("actionLink")
+    or data.get("action_link")
+    or data.get("actionLink")
+  )
+  user = data.get("user") if isinstance(data.get("user"), dict) else {}
+  user_id = user.get("id") or data.get("id")
+  if not user_id or not action_link:
+    raise RuntimeError("Supabase generate_link did not return a user id and action_link")
+  return str(user_id), str(action_link)
+
+
 def invite_user_by_email(email: str, redirect_to: str, user_metadata: Optional[dict] = None) -> str:
   """
   Send a Supabase invite email via GoTrue POST /auth/v1/invite.
@@ -98,6 +148,22 @@ def invite_user_by_email(email: str, redirect_to: str, user_metadata: Optional[d
   return str(user_id)
 
 
+def delete_auth_user(user_id: str) -> None:
+  """Remove a login from Supabase Auth. 404 means it is already gone."""
+  base, headers = supabase_admin_config(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
+  try:
+    response = httpx.delete(
+      f"{base}/auth/v1/admin/users/{user_id}",
+      headers=headers,
+      timeout=30,
+    )
+  except httpx.HTTPError as exc:
+    raise RuntimeError(f"Supabase delete user request failed: {exc}") from exc
+  if response.status_code in (404, 422):
+    return
+  _raise_for_status(response, "delete user")
+
+
 def get_auth_user_id_by_email(email: str) -> Optional[str]:
   base, headers = supabase_admin_config(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
   target = email.strip().lower()
@@ -122,23 +188,3 @@ def get_auth_user_id_by_email(email: str) -> Optional[str]:
     if len(users) < 200:
       break
   return None
-
-
-def send_login_link(email: str, redirect_to: str) -> None:
-  """Email a magic link so an existing Auth user can open /invite."""
-  base, headers = supabase_admin_config(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
-  payload = {
-    "type": "magiclink",
-    "email": email,
-    "options": {"redirect_to": redirect_to},
-  }
-  try:
-    response = httpx.post(
-      f"{base}/auth/v1/admin/generate_link",
-      headers=headers,
-      json=payload,
-      timeout=30,
-    )
-  except httpx.HTTPError as exc:
-    raise RuntimeError(f"Supabase login link request failed: {exc}") from exc
-  _raise_for_status(response, "login link")

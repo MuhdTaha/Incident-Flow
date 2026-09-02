@@ -38,6 +38,7 @@ export type DetailedUserStat = {
   resolved_count: number;
   comments_made: number;
   escalations_triggered: number;
+  invite_pending?: boolean;
 };
 
 type DashboardStats = {
@@ -211,15 +212,21 @@ export default function AdminDashboard() {
                 <TableCell className="font-medium">{u.full_name}</TableCell>
                 <TableCell className="text-slate-600 dark:text-slate-400">{u.email}</TableCell>
                 <TableCell className="text-center">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                    ${u.role === 'ADMIN' ? 'bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-200' : 
-                      u.role === 'MANAGER' ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-500/20 dark:text-cyan-200' : 
-                      'bg-slate-100 text-slate-800 dark:bg-white/10 dark:text-slate-200'}`}>
-                    {u.role || "ENGINEER"} 
-                  </span>
+                  {u.invite_pending ? (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200">
+                      Pending invite
+                    </span>
+                  ) : (
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                      ${u.role === 'ADMIN' ? 'bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-200' : 
+                        u.role === 'MANAGER' ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-500/20 dark:text-cyan-200' : 
+                        'bg-slate-100 text-slate-800 dark:bg-white/10 dark:text-slate-200'}`}>
+                      {u.role || "ENGINEER"} 
+                    </span>
+                  )}
                 </TableCell>
-                <TableCell className="text-center">{u.assigned_count}</TableCell>
-                <TableCell className="text-center text-emerald-600 dark:text-emerald-400 font-medium">{u.resolved_count}</TableCell>
+                <TableCell className="text-center">{u.invite_pending ? "—" : u.assigned_count}</TableCell>
+                <TableCell className="text-center text-emerald-600 dark:text-emerald-400 font-medium">{u.invite_pending ? "—" : u.resolved_count}</TableCell>
                 <TableCell className="text-center">
                   <div className="flex items-center justify-center space-x-2">
                     <Button 

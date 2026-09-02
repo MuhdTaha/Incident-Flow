@@ -1,0 +1,56 @@
+from app.core.invite_email import send_org_invite_email
+
+
+def test_send_prefers_smtp_when_host_set(monkeypatch):
+  monkeypatch.setenv("SMTP_HOST", "mailhog")
+  monkeypatch.setenv("SMTP_PORT", "1025")
+  monkeypatch.setenv("MAILJET_API_KEY", "k")
+  monkeypatch.setenv("MAILJET_API_SECRET", "s")
+  sent = []
+
+  def fake_smtp(to_email, subject, html, host, port, sender):
+    sent.append(("smtp", to_email, host, port, sender))
+
+  monkeypatch.setattr("app.core.invite_email._send_smtp", fake_smtp)
+  monkeypatch.setattr(
+    "app.core.invite_email._send_mailjet",
+    lambda *args, **kwargs: sent.append("mailjet"),
+  )
+
+  send_org_invite_email("alex@company.com", "Acme", "https://app.example/invite")
+
+  assert sent == [("smtp", "alex@company.com", "mailhog", 1025, "alerts@incidentflow.email")]
+
+
+def test_send_uses_mailjet_when_smtp_unset(monkeypatch):
+  monkeypatch.delenv("SMTP_HOST", raising=False)
+  monkeypatch.setenv("MAILJET_API_KEY", "k")
+  monkeypatch.setenv("MAILJET_API_SECRET", "s")
+  monkeypatch.setenv("MAILJET_SENDER_EMAIL", "invites@incidentflow.email")
+  sent = []
+
+  def fake_mailjet(to_email, subject, html, api_key, api_secret, sender):
+    sent.append((to_email, api_key, sender, subject))
+
+  monkeypatch.setattr("app.core.invite_email._send_mailjet", fake_mailjet)
+  monkeypatch.setattr(
+    "app.core.invite_email._send_smtp",
+    lambda *args, **kwargs: sent.append("smtp"),
+  )
+
+  send_org_invite_email("alex@company.com", "Acme", "https://app.example/invite")
+
+  assert sent == [("alex@company.com", "k", "invites@incidentflow.email", "Join Acme on IncidentFlow")]
+
+
+def test_send_raises_when_unconfigured(monkeypatch):
+  monkeypatch.delenv("SMTP_HOST", raising=False)
+  monkeypatch.delenv("MAILJET_API_KEY", raising=False)
+  monkeypatch.delenv("MAILJET_API_SECRET", raising=False)
+
+  try:
+    send_org_invite_email("alex@company.com", "Acme", "https://app.example/invite")
+  except RuntimeError as exc:
+    assert "not configured" in str(exc).lower()
+  else:
+    raise AssertionError("expected RuntimeError")

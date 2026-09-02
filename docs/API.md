@@ -40,7 +40,7 @@ The API resolves the user from Postgres and enforces `organization_id` on every 
 
 \* Uses token claims only — user row may not exist yet.
 
-Invite body: `{ "email": "alex@company.com", "role": "ENGINEER" }`. `role` is `ENGINEER` (default), `MANAGER`, or `ADMIN`. Duplicate emails return **409** (already in this workspace, or already in another org — one account per email). If the address already exists in Supabase Auth but has no local org row, the API sends a magic link and attaches them to this org. Missing Supabase secret-key credentials return **501**. The email links to `{FRONTEND_URL}/invite`.
+Invite body: `{ "email": "alex@company.com", "role": "ENGINEER" }`. `role` is `ENGINEER` (default), `MANAGER`, or `ADMIN`. Duplicate emails return **409**. The API generates a Supabase invite link and emails it via **Mailjet** (production) or **SMTP/Mailhog** (local). The local user is created as `invite_pending` until they set a password on `/invite`. Missing secret-key credentials return **501**. Email send failure returns **502** and rolls back the Auth user.
 
 ### Incidents — `/incidents`
 
@@ -73,7 +73,7 @@ Invite body: `{ "email": "alex@company.com", "role": "ENGINEER" }`. `role` is `E
 | PATCH | `/users/me` | Yes | Update own `full_name` / `phone_number` (role changes are ignored) |
 | GET | `/users` | Yes | List org users |
 | PATCH | `/users/{id}/role` | Admin | Change role |
-| DELETE | `/users/{id}` | Admin | Remove user |
+| DELETE | `/users/{id}` | Admin | Remove user from the org and from Supabase Auth |
 
 ### Admin — `/admin`
 

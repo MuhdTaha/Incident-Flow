@@ -113,6 +113,20 @@ def test_list_users_scoped(client, db, auth_override, admin_user, test_organizat
   assert all(u["organization_id"] == str(test_organization.id) for u in data)
 
 
+def test_list_users_hides_pending_invitees(client, db, auth_override, admin_user, test_organization):
+  pending = _create_user(db, test_organization.id, UserRole.ENGINEER, "pending@users.com")
+  pending.invite_pending = True
+  db.commit()
+
+  app.dependency_overrides[get_current_user] = lambda: admin_user
+  response = client.get("/api/v1/users")
+
+  assert response.status_code == 200
+  emails = {u["email"] for u in response.json()}
+  assert pending.email not in emails
+  assert admin_user.email in emails
+
+
 def test_update_role_admin_success(client, db, auth_override, admin_user, test_organization):
   target_user = _create_user(db, test_organization.id, UserRole.ENGINEER, "target@users.com")
 
@@ -152,6 +166,23 @@ def test_delete_user_admin_only(client, db, auth_override, admin_user, engineer_
   assert db.query(User).filter(User.id == target_user.id).first() is None
 
 
+def test_delete_user_removes_auth_login(
+  client, db, auth_override, admin_user, test_organization, monkeypatch
+):
+  target_user = _create_user(db, test_organization.id, UserRole.ENGINEER, "auth-del@users.com")
+  deleted = []
+  monkeypatch.setattr(
+    "app.services.user_service.delete_auth_user",
+    lambda user_id: deleted.append(user_id),
+  )
+  app.dependency_overrides[get_current_user] = lambda: admin_user
+  response = client.delete(f"/api/v1/users/{target_user.id}")
+
+  assert response.status_code == 200
+  assert deleted == [str(target_user.id)]
+  assert db.query(User).filter(User.id == target_user.id).first() is None
+
+
 def test_patch_me_updates_full_name(client, auth_override, engineer_user, db):
   app.dependency_overrides[get_current_user] = lambda: engineer_user
   response = client.patch("/api/v1/users/me", json={"full_name": "Ada Lovelace"})
@@ -162,6 +193,17 @@ def test_patch_me_updates_full_name(client, auth_override, engineer_user, db):
   assert data["role"] == "ENGINEER"
   db.refresh(engineer_user)
   assert engineer_user.full_name == "Ada Lovelace"
+
+
+def test_patch_me_clears_invite_pending(client, auth_override, engineer_user, db):
+  engineer_user.invite_pending = True
+  db.flush()
+  app.dependency_overrides[get_current_user] = lambda: engineer_user
+  response = client.patch("/api/v1/users/me", json={"full_name": "Ada Lovelace"})
+
+  assert response.status_code == 200
+  db.refresh(engineer_user)
+  assert engineer_user.invite_pending is False
 
 
 def test_patch_me_ignores_role_escalation(client, auth_override, engineer_user, db):
