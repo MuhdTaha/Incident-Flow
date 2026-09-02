@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from app.db import models
 from app.repositories.user_repo import UserRepository
-from supabase import create_client, Client
+from app.core.supabase_admin import invite_user_by_email
 
 INVITABLE_ROLES = {
   models.UserRole.ENGINEER,
@@ -24,17 +24,7 @@ class OrganizationService:
   def __init__(self, db: Session):
     self.db = db
     self.repo = UserRepository(db)
-    self.supabase_url = os.getenv("SUPABASE_URL")
-    self.supabase_key = os.getenv("SUPABASE_KEY")
     self.frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000").rstrip("/")
-    self.supabase = None
-
-    if self.supabase_url and self.supabase_key:
-      try:
-        self.supabase: Client = create_client(self.supabase_url, self.supabase_key)
-      except Exception as e:
-        print(f"Warning: Failed to initialize Supabase client: {e}")
-        self.supabase = None
 
   def _commit(self):
     self.db.commit()
@@ -96,20 +86,20 @@ class OrganizationService:
     if existing:
       raise HTTPException(status_code=409, detail="A user with this email already exists")
 
-    if not self.supabase:
-      raise HTTPException(status_code=501, detail="Supabase credentials not configured")
-
     try:
-      response = self.supabase.auth.admin.invite_user_by_email(
+      user_id = invite_user_by_email(
         email,
-        {
-          "redirect_to": f"{self.frontend_url}/invite",
-          "data": {"org_id": str(org_id)},
-        },
+        redirect_to=f"{self.frontend_url}/invite",
+        user_metadata={"org_id": str(org_id)},
       )
-      user_id = response.user.id
-    except Exception as e:
-      raise HTTPException(status_code=400, detail=f"Supabase User invitation failed: {str(e)}")
+    except RuntimeError as e:
+      message = str(e)
+      lowered = message.lower()
+      status = 501 if any(
+        token in lowered
+        for token in ("required", "publishable", "placeholder", "anon")
+      ) else 400
+      raise HTTPException(status_code=status, detail=message) from e
 
     try:
       new_user = models.User(

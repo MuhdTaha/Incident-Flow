@@ -4,8 +4,8 @@ from app.db.models import Organization, User, UserRole
 from app.services.demo_seed_service import (
   DEMO_USER_SPECS,
   DemoSeedService,
-  supabase_admin_config,
 )
+from app.core.supabase_admin import supabase_admin_config
 
 
 def test_admin_config_rejects_publishable_key():

@@ -1,6 +1,4 @@
 import uuid
-from types import SimpleNamespace
-
 from app.main import app
 from app.api.deps import get_current_user
 from app.db.models import User, UserRole, Organization
@@ -77,23 +75,18 @@ def test_invite_success_creates_local_user(client, db, monkeypatch):
   org = _create_org(db, "Success Org", "success-org")
   admin = _create_user(db, org.id, UserRole.ADMIN, "admin-success@invite.com")
   invited_id = uuid.uuid4()
+  captured = {}
 
-  class FakeAdmin:
-    def invite_user_by_email(self, email, options=None):
-      self.email = email
-      self.options = options
-      return SimpleNamespace(user=SimpleNamespace(id=str(invited_id)))
-
-  fake_admin = FakeAdmin()
-
-  class FakeClient:
-    def __init__(self):
-      self.auth = SimpleNamespace(admin=fake_admin)
+  def fake_invite(email, redirect_to, user_metadata=None):
+    captured["email"] = email
+    captured["redirect_to"] = redirect_to
+    captured["user_metadata"] = user_metadata
+    return str(invited_id)
 
   monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
-  monkeypatch.setenv("SUPABASE_KEY", "service-role-key")
+  monkeypatch.setenv("SUPABASE_KEY", "sb_secret_testkey")
   monkeypatch.setenv("FRONTEND_URL", "http://localhost:3000")
-  monkeypatch.setattr("app.services.org_service.create_client", lambda url, key: FakeClient())
+  monkeypatch.setattr("app.services.org_service.invite_user_by_email", fake_invite)
 
   app.dependency_overrides[get_current_user] = lambda: admin
   response = client.post(
@@ -105,8 +98,8 @@ def test_invite_success_creates_local_user(client, db, monkeypatch):
   data = response.json()
   assert data["user_id"] == str(invited_id)
   assert "jordan.lee@company.com" in data["message"].lower()
-  assert fake_admin.options["redirect_to"] == "http://localhost:3000/invite"
-  assert fake_admin.options["data"]["org_id"] == str(org.id)
+  assert captured["redirect_to"] == "http://localhost:3000/invite"
+  assert captured["user_metadata"]["org_id"] == str(org.id)
 
   created = db.query(User).filter(User.id == invited_id).first()
   assert created is not None
@@ -114,4 +107,37 @@ def test_invite_success_creates_local_user(client, db, monkeypatch):
   assert created.full_name == "Jordan Lee"
   assert created.role == UserRole.MANAGER
   assert created.organization_id == org.id
+  app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_invite_501_when_credentials_missing(client, db, monkeypatch):
+  org = _create_org(db, "No Creds Org", "no-creds-org")
+  admin = _create_user(db, org.id, UserRole.ADMIN, "admin-nocreds@invite.com")
+  monkeypatch.delenv("SUPABASE_URL", raising=False)
+  monkeypatch.delenv("SUPABASE_KEY", raising=False)
+  app.dependency_overrides[get_current_user] = lambda: admin
+
+  response = client.post(
+    "/api/v1/orgs/invite",
+    json={"email": "new@invite.com", "role": "ENGINEER"},
+  )
+
+  assert response.status_code == 501
+  app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_invite_501_when_anon_key(client, db, monkeypatch):
+  org = _create_org(db, "Anon Key Org", "anon-key-org")
+  admin = _create_user(db, org.id, UserRole.ADMIN, "admin-anon@invite.com")
+  monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
+  monkeypatch.setenv("SUPABASE_KEY", "sb_publishable_not_secret")
+  app.dependency_overrides[get_current_user] = lambda: admin
+
+  response = client.post(
+    "/api/v1/orgs/invite",
+    json={"email": "new@invite.com", "role": "ENGINEER"},
+  )
+
+  assert response.status_code == 501
+  assert "publishable" in response.json()["detail"].lower()
   app.dependency_overrides.pop(get_current_user, None)

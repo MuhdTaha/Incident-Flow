@@ -40,7 +40,7 @@ Key technical choices and trade-offs. Useful for portfolio reviewers evaluating 
 
 **Invites:** `POST /orgs/invite` (admin only) calls Supabase `invite_user_by_email` with `redirect_to` `{FRONTEND_URL}/invite`, then creates the local `User` in the admin’s org. Invitees never hit `/register`. Incident alerts still go through Mailjet/Celery — mixing those would duplicate email stacks and lose Supabase’s invite-token handling.
 
-**Requires:** `SUPABASE_URL` + service-role `SUPABASE_KEY`, plus `/invite` on the Supabase Auth redirect allow-list. Missing credentials return **501**.
+**Requires:** `SUPABASE_URL` + secret/`service_role` `SUPABASE_KEY` (`sb_secret_…` or a legacy JWT — not the publishable anon key), plus `/invite` on the Supabase Auth redirect allow-list. Invites call GoTrue `POST /auth/v1/invite` directly because supabase-py 2.6 rejects modern `sb_secret_` keys. Missing or anon credentials return **501**.
 
 ---
 
@@ -108,8 +108,8 @@ Key technical choices and trade-offs. Useful for portfolio reviewers evaluating 
 
 - Analytics SQL targets Postgres features (test suite mocks some queries for SQLite)
 - No websocket / live updates (30s poll + manual refresh)
-- Invite flow requires a valid Supabase **service role** key (`SUPABASE_KEY`); the anon key cannot send invites
-- Invite emails come from Supabase (not Mailhog). Add `http://localhost:3000/invite` to the Auth redirect allow-list
+- Invite flow requires a valid Supabase **secret / service_role** key (`SUPABASE_KEY`); `sb_publishable_` / anon keys cannot send invites
+- Invite emails come from Supabase (not Mailhog). Add `/invite` to the Auth redirect allow-list; set `FRONTEND_URL` on Render to the Vercel origin
 - E2E tests need a pre-provisioned Supabase test user
 - Demo seed targets one org (`DEMO_ORG_ID`); users in other orgs will not see the catalog
 

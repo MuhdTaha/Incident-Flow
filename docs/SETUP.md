@@ -174,6 +174,6 @@ make clean           # stop + remove volumes (wipes DB)
 | Dashboard empty after seed | Confirm your user is in `DEMO_ORG_ID` / Default Org |
 | Deployed dashboard empty | Run `python -m scripts.seed_demo --refresh` against deployed `DATABASE_URL`, or trigger **Demo Seed Refresh** |
 | Demo refresh not running on Render | Ensure worker + beat are deployed and share Redis/`DATABASE_URL`; or rely on the GitHub Actions cron |
-| Invite returns 501 / “Supabase credentials not configured” | Set `SUPABASE_URL` and the **service_role** `SUPABASE_KEY` (not the anon key) |
-| Invite returns 400 / “Invalid API key” | Rotate `SUPABASE_KEY` to the current secret key from Dashboard → Settings → API |
-| Invite email link lands on the wrong page | Add `http://localhost:3000/invite` (and production `/invite`) to Supabase Auth **Redirect URLs**; set `FRONTEND_URL` on the API |
+| Invite returns 501 / “Supabase credentials not configured” | Set `SUPABASE_URL` and the **secret / service_role** `SUPABASE_KEY` on the **Render API** service (not the anon/`sb_publishable_` key). Redeploy after saving. |
+| Invite returns 501 mentioning publishable/anon | You pasted the frontend anon key. Use **secret** (`sb_secret_…` or legacy `service_role` JWT) |
+| Invite email link lands on the wrong page | Add `https://<vercel-app>/invite` and `http://localhost:3000/invite` to Supabase Auth **Redirect URLs**; set `FRONTEND_URL` on the API to the Vercel origin (e.g. `https://incident-flow-nine.vercel.app`) |

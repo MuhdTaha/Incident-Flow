@@ -25,6 +25,7 @@ from app.core.constants import (
   SYSTEM_BOT_NAME,
 )
 from app.core.fsm import VALID_TRANSITIONS, IncidentStatus, can_transition
+from app.core.supabase_admin import supabase_admin_config
 from app.db import models
 
 
@@ -233,36 +234,6 @@ def resolve_org_id() -> UUID:
   if raw:
     return UUID(raw)
   return DEFAULT_ORG_ID
-
-
-def _strip_env(value: Optional[str]) -> str:
-  return (value or "").strip().strip('"').strip("'")
-
-
-def supabase_admin_config(url: Optional[str], key: Optional[str]) -> Tuple[str, dict]:
-  """
-  Auth Admin HTTP config.
-
-  supabase-py 2.6 only accepts legacy JWTs (eyJ...). Newer projects issue
-  sb_secret_ keys, so we call GoTrue directly instead of create_client().
-  """
-  base = _strip_env(url).rstrip("/")
-  secret = _strip_env(key)
-  if not base or not secret:
-    raise RuntimeError("SUPABASE_URL and SUPABASE_KEY are required to provision demo logins")
-  if secret.startswith("sb_publishable_") or secret.startswith("sb_anon_"):
-    raise RuntimeError(
-      "SUPABASE_KEY is the publishable/anon key. Use the secret key "
-      "(Dashboard → Settings → API → secret / service_role)."
-    )
-  if secret.startswith("your-") or secret == "your-service-role-key":
-    raise RuntimeError("SUPABASE_KEY is still the placeholder from .env.example")
-  headers = {
-    "apikey": secret,
-    "Authorization": f"Bearer {secret}",
-    "Content-Type": "application/json",
-  }
-  return base, headers
 
 
 class DemoSeedService:
