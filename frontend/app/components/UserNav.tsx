@@ -33,20 +33,20 @@ export default function UserNav() {
     <div className="relative">
       <Button
         variant="ghost"
-        className="flex items-center gap-2 pl-4 pr-5 pt-7 pb-7 rounded-full hover:bg-slate-200 transition-colors"
+        className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full hover:bg-slate-200 dark:hover:bg-white/10 transition-colors"
         onClick={() => setIsOpen(!isOpen)}
       >
-        <div className="h-10 w-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold">
+        <div className="h-8 w-8 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-full flex items-center justify-center text-xs text-white font-bold shadow-md shadow-blue-500/20">
           {initials}
         </div>
         <div className="text-left hidden md:block">
-          <div className="text-sm font-semibold text-slate-700 leading-none">
+          <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 leading-none">
             {displayName}
           </div>
-          <div className="text-[10px] text-slate-500 leading-none mt-1">
+          <div className="text-[10px] text-slate-600 dark:text-slate-400 leading-none mt-1">
             {user.email}
           </div>
-          <div className="text-[10px] text-slate-500 leading-none mt-1">
+          <div className="text-[10px] text-slate-600 dark:text-slate-400 leading-none mt-1">
             {role || "User"}
           </div>
         </div>
@@ -60,19 +60,19 @@ export default function UserNav() {
             onClick={() => setIsOpen(false)} 
           />
           
-          <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg border border-slate-100 z-50 py-1 animate-in fade-in zoom-in duration-75">
-            <div className="px-4 py-3 border-b border-slate-100">
-              <p className="text-sm font-medium text-slate-900">
+          <div className="absolute right-0 mt-2 w-56 bg-white/90 dark:bg-slate-900/95 rounded-2xl shadow-xl shadow-blue-950/10 border border-slate-200/70 dark:border-white/10 backdrop-blur-md z-50 py-1 animate-in fade-in zoom-in duration-75">
+            <div className="px-4 py-3 border-b border-slate-100 dark:border-white/10">
+              <p className="text-sm font-medium text-slate-900 dark:text-slate-50">
                 {displayName} ({role})
               </p>
-              <p className="text-xs text-slate-500 truncate">{user.email}</p>
+              <p className="text-xs text-slate-600 dark:text-slate-400 truncate">{user.email}</p>
             </div>
 
             {isAdmin && (
               <div className="py-1">
                 <Link
                   href="/admin"
-                  className="cursor-pointer w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+                  className="cursor-pointer w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-2 transition-colors"
                   onClick={() => setIsOpen(false)}
                 >
                   <LayoutDashboard className="h-4 w-4" />
@@ -81,10 +81,10 @@ export default function UserNav() {
               </div>
             )}
 
-            <div className="border-t border-slate-100 py-1">
+            <div className="border-t border-slate-100 dark:border-white/10 py-1">
               <button
                 onClick={handleLogout}
-                className="cursor-pointer w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                className="cursor-pointer w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 flex items-center gap-2 transition-colors"
               >
                 <LogOut className="h-4 w-4" /> Sign out
               </button>

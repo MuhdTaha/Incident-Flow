@@ -22,6 +22,7 @@ import IncidentHistory from "./components/IncidentHistory";
 import CreateIncidentModal from "./components/CreateIncidentModal";
 import IncidentActionModal from "./components/IncidentActionModal";
 import AppHeader from "./components/AppHeader";
+import { AppShell } from "./components/AppShell";
 import IncidentStats from "./components/IncidentStats";
 import { IncidentFilters, FilterState } from "./components/IncidentFilters";
 import { getSevStyles, getStatusIcon } from "@/lib/incident-utils";
@@ -123,8 +124,7 @@ export default function IncidentDashboard() {
   }, [incidents, filters]);
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8 bg-slate-50/50 min-h-screen">
-      {/* Header Section */}
+    <AppShell>
       <div className="print:hidden">
         <AppHeader />
       </div>
@@ -132,63 +132,62 @@ export default function IncidentDashboard() {
       {/* Summary Stat Cards */}
       <IncidentStats incidents={incidents} />
 
-      {/* 3. New Action & Filter Bar */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <Card className="relative z-30 gap-0 overflow-visible py-3">
+        <CardContent className="space-y-3 px-3">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <IncidentFilters filters={filters} setFilters={setFilters} />
           
-          <div className="flex items-center gap-3 border-t md:border-t-0 pt-4 md:pt-0">
+          <div className="flex items-center gap-2 border-t md:border-t-0 border-blue-100/70 dark:border-white/10 pt-3 md:pt-0">
              {lastUpdated && (
-               <span className="text-xs text-slate-400 whitespace-nowrap">
+               <span className="text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap">
                  Last updated {lastUpdated.toLocaleTimeString()}
                </span>
              )}
-             <Button onClick={refresh} variant="ghost" size="sm" className="text-slate-500" disabled={loading}>
+             <Button onClick={refresh} variant="ghost" size="sm" className="text-slate-600 dark:text-slate-400" disabled={loading}>
                 <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} /> Refresh
              </Button>
              <CreateIncidentModal onIncidentCreated={refresh} />
           </div>
         </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      {/* Main Content */}
-      <Card className="shadow-md border-slate-200 gap-0 py-0 overflow-hidden">
-        <CardHeader className="border-b bg-white pt-6">
-          <CardTitle className="text-lg font-semibold text-slate-800">Incident Queue</CardTitle>
+      <Card className="relative z-0 gap-0 py-0 overflow-hidden">
+        <CardHeader className="border-b border-slate-200/70 dark:border-white/10 bg-white/40 dark:bg-white/5 pt-4 pb-3">
+          <CardTitle className="text-base font-semibold text-slate-800 dark:text-slate-100">Incident Queue</CardTitle>
         </CardHeader>
-        <CardContent className="p-0 bg-white">
+        <CardContent className="p-0 bg-white/40 dark:bg-transparent">
           <Table>
-            {/* Table Header */}
-            <TableHeader className="bg-slate-50">
+            <TableHeader className="bg-blue-50/50 dark:bg-blue-500/10">
               <TableRow>
-                <TableHead className="w-25 pl-6 uppercase text-[11px] font-bold text-slate-500">Severity</TableHead>
-                <TableHead className="uppercase text-[11px] font-bold text-slate-500">Incident Details</TableHead>
-                <TableHead className="uppercase text-[11px] font-bold text-slate-500">Assignee</TableHead>
-                <TableHead className="uppercase text-[11px] font-bold text-slate-500">Current Status</TableHead>
-                <TableHead className="text-right pr-6 uppercase text-[11px] font-bold text-slate-500">Workflow Action</TableHead>
+                <TableHead className="w-25 pl-4 uppercase text-[11px] font-bold text-slate-600 dark:text-slate-400">Severity</TableHead>
+                <TableHead className="uppercase text-[11px] font-bold text-slate-600 dark:text-slate-400">Incident Details</TableHead>
+                <TableHead className="uppercase text-[11px] font-bold text-slate-600 dark:text-slate-400">Assignee</TableHead>
+                <TableHead className="uppercase text-[11px] font-bold text-slate-600 dark:text-slate-400">Current Status</TableHead>
+                <TableHead className="text-right pr-4 uppercase text-[11px] font-bold text-slate-600 dark:text-slate-400">Workflow Action</TableHead>
               </TableRow>
             </TableHeader>
 
             <TableBody>
               {filteredIncidents.map((incident) => (
-                <TableRow key={incident.id} className="hover:bg-blue-50 transition-colors cursor-pointer" onClick={() => setSelectedIncidentId(incident.id)}>
+                <TableRow key={incident.id} className="hover:bg-cyan-50/50 dark:hover:bg-cyan-500/10 transition-colors cursor-pointer" onClick={() => setSelectedIncidentId(incident.id)}>
                   {/* Severity Cell */}
-                  <TableCell className="pl-6">
+                  <TableCell className="pl-4">
                     <Badge variant="outline" className={getSevStyles(incident.severity)}>
                       {incident.severity}
                     </Badge>
                   </TableCell>
 
                   {/* Incident Details Cell */}
-                  <TableCell className="py-4">
-                    <div className="font-semibold text-slate-900 text-base">{incident.title}</div>
-                    <div className="text-xs text-slate-400 font-mono mt-0.5">{incident.id.slice(0, 8)}...</div>
-                    <div className="text-xs text-slate-600 mt-1">{new Date(incident.updated_at).toLocaleString()}</div>
+                  <TableCell className="py-2.5">
+                    <div className="font-semibold text-slate-900 dark:text-slate-50 text-sm">{incident.title}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">{incident.id.slice(0, 8)}...</div>
+                    <div className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{new Date(incident.updated_at).toLocaleString()}</div>
                   </TableCell>
 
                   {/* Assignee Cell */}
-                  <TableCell className="py-4">
-                    <div className="flex items-center gap-2.5 font-medium text-slate-700">
+                  <TableCell className="py-2.5">
+                    <div className="flex items-center gap-2.5 font-medium text-slate-700 dark:text-slate-200">
                       <User className="h-3.5 w-3.5" />
                       <span className="text-sm">{userMap[incident.owner_id]?.full_name || "Unassigned"}</span>
                     </div>
@@ -196,18 +195,18 @@ export default function IncidentDashboard() {
 
                   {/* Current Status Cell */}
                   <TableCell>
-                    <div className="flex items-center gap-2.5 font-medium text-slate-700">
+                    <div className="flex items-center gap-2.5 font-medium text-slate-700 dark:text-slate-200">
                       {getStatusIcon(incident.status)}
                       <span className="text-sm">{incident.status}</span>
                     </div>
                   </TableCell>
 
                   {/* Action Button Cell */}
-                  <TableCell className="text-right pr-6">
+                  <TableCell className="text-right pr-4">
                     <Button
                       variant="outline"
                       size="sm"
-                      className="gap-2 text-slate-600"
+                      className="h-7 gap-1.5 text-slate-700 dark:text-slate-300"
                       onClick={(e) => {
                         e.stopPropagation();
                         setActionIncident(incident);
@@ -248,6 +247,6 @@ export default function IncidentDashboard() {
           setSelectedIncidentId(actionIncident ? actionIncident.id : null);
         }}
       />
-    </div>
+    </AppShell>
   );
 }

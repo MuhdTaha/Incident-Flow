@@ -12,15 +12,15 @@ import {
 export const getSevStyles = (sev: string) => {
   switch (sev) {
     case "SEV1": 
-      return "bg-red-100 text-red-700 border-red-200 hover:bg-red-100 font-bold";
+      return "bg-red-100 text-red-700 border-red-200 hover:bg-red-100 dark:bg-red-500/20 dark:text-red-300 dark:border-red-500/30 dark:hover:bg-red-500/20 font-bold";
     case "SEV2": 
-      return "bg-orange-100 text-orange-700 border-orange-200 hover:bg-orange-100";
+      return "bg-orange-100 text-orange-700 border-orange-200 hover:bg-orange-100 dark:bg-orange-500/20 dark:text-orange-300 dark:border-orange-500/30 dark:hover:bg-orange-500/20";
     case "SEV3": 
-      return "bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100";
+      return "bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100 dark:bg-blue-500/20 dark:text-blue-300 dark:border-blue-500/30 dark:hover:bg-blue-500/20";
     case "SEV4":
-      return "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-100";
+      return "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-100 dark:bg-white/10 dark:text-slate-200 dark:border-white/15 dark:hover:bg-white/10";
     default: 
-      return "bg-slate-50 text-slate-500 border-slate-200";
+      return "bg-slate-50 text-slate-500 border-slate-200 dark:bg-white/5 dark:text-slate-400 dark:border-white/10";
   }
 };
 
@@ -38,8 +38,8 @@ export const getStatusIcon = (status: string) => {
     case "MITIGATED": 
       return <ShieldAlert className={`${iconProps} text-green-500`} />;
     case "RESOLVED": 
-      return <CheckCircle className={`${iconProps} text-slate-500`} />;
+      return <CheckCircle className={`${iconProps} text-slate-600 dark:text-slate-400`} />;
     default: 
-      return <Clock className={`${iconProps} text-slate-400`} />;
+      return <Clock className={`${iconProps} text-slate-500 dark:text-slate-400`} />;
   }
 };

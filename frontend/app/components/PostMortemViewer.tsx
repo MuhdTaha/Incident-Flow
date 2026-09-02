@@ -75,22 +75,22 @@ export default function PostMortemViewer({ incidentId, status }: PostMortemViewe
   };
 
   return (
-    <div className="mt-8 border-t border-slate-200 pt-6">
+    <div className="mt-4 pt-2">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold flex items-center gap-2 text-slate-800">
+        <h3 className="text-sm font-semibold flex items-center gap-2 text-slate-800 dark:text-slate-100">
           <Sparkles className="h-4 w-4 text-purple-500" />
           AI Post-Mortem Report
         </h3>
 
         {hasReport ? (
           <div className="flex items-center gap-2">
-            <Button onClick={() => openReport(false)} size="sm" variant="secondary" className="bg-purple-50 text-purple-700 hover:bg-purple-100">
+            <Button onClick={() => openReport(false)} size="sm" variant="secondary" className="bg-purple-50 text-purple-700 hover:bg-purple-100 dark:bg-purple-500/20 dark:text-purple-200 dark:hover:bg-purple-500/30">
               <Eye className="h-4 w-4 mr-2" />
               View Report
             </Button>
           </div>
         ) : (
-          <Button onClick={generateReport} disabled={loading || checking} size="sm" variant="secondary" className="bg-purple-50 text-purple-700 hover:bg-purple-100">
+          <Button onClick={generateReport} disabled={loading || checking} size="sm" variant="secondary" className="bg-purple-50 text-purple-700 hover:bg-purple-100 dark:bg-purple-500/20 dark:text-purple-200 dark:hover:bg-purple-500/30">
             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileText className="h-4 w-4 mr-2" />}
             {loading ? "Analyzing Logs..." : checking ? "Checking Report..." : "Generate Report"}
           </Button>

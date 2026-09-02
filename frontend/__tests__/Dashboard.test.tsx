@@ -112,8 +112,8 @@ describe('IncidentDashboard', () => {
     const incidentTitle = await screen.findByText('Database Latency Spike')
     expect(incidentTitle).toBeInTheDocument()
 
-    // Check if SEV1 badge is rendered
-    expect(screen.getByText('SEV1')).toBeInTheDocument()
+    // Check if SEV1 badge is rendered (stat card + incident row)
+    expect(screen.getAllByText('SEV1').length).toBeGreaterThan(0)
     expect(screen.getByText(/Last updated/)).toBeInTheDocument()
     
     // Check if the mock API was actually called

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { Check, Filter, X, ChevronDown } from "lucide-react";
+import { useState, useRef, useEffect, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
+import { X, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useUserDirectory } from "@/context/UserContext";
@@ -33,23 +34,41 @@ function MultiSelectDropdown({
   onChange: (values: string[]) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
+  const updatePosition = () => {
+    const el = buttonRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    setMenuPos({ top: rect.bottom + 4, left: rect.left });
+  };
 
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    updatePosition();
+    window.addEventListener("scroll", updatePosition, true);
+    window.addEventListener("resize", updatePosition);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener("scroll", updatePosition, true);
+      window.removeEventListener("resize", updatePosition);
     };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (wrapRef.current?.contains(target) || menuRef.current?.contains(target)) {
+        return;
+      }
+      setIsOpen(false);
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen]);
 
   const toggleOption = (option: string) => {
@@ -61,39 +80,49 @@ function MultiSelectDropdown({
   };
 
   return (
-    <div className="relative inline-block" ref={dropdownRef}>
+    <div className="relative inline-block" ref={wrapRef}>
       <button
+        ref={buttonRef}
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 h-9 px-3 bg-white border border-slate-200 rounded-md text-sm hover:bg-slate-50 transition-colors"
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
+        className="flex items-center gap-2 h-8 px-2.5 bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-white/10 rounded-md text-sm text-slate-800 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
       >
         {label}
         {selected.length > 0 && (
-          <Badge variant="secondary" className="ml-1 bg-blue-50 text-blue-700">
+          <Badge variant="secondary" className="ml-0.5 bg-blue-50 text-blue-800 dark:bg-blue-500/20 dark:text-blue-200">
             {selected.length}
           </Badge>
         )}
-        <ChevronDown className="h-4 w-4 text-slate-400" />
+        <ChevronDown className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
       </button>
 
-      {isOpen && (
-        <div className="absolute top-full mt-1 left-0 bg-white border border-slate-200 rounded-md shadow-lg z-10 min-w-48">
-          <div className="p-2">
+      {isOpen && createPortal(
+        <div
+          ref={menuRef}
+          role="listbox"
+          style={{ top: menuPos.top, left: menuPos.left }}
+          className="fixed z-[80] min-w-48 rounded-md border border-slate-200 bg-white shadow-lg dark:border-white/10 dark:bg-slate-900"
+        >
+          <div className="p-1.5">
             {options.map((option) => (
               <label
                 key={option}
-                className="flex items-center gap-2 p-2 hover:bg-slate-50 rounded cursor-pointer"
+                className="flex items-center gap-2 p-1.5 hover:bg-slate-50 dark:hover:bg-white/5 rounded cursor-pointer"
               >
                 <input
                   type="checkbox"
                   checked={selected.includes(option)}
                   onChange={() => toggleOption(option)}
-                  className="h-4 w-4 rounded border-slate-300 cursor-pointer"
+                  className="h-3.5 w-3.5 rounded border-slate-300 cursor-pointer"
                 />
-                <span className="text-sm">{option}</span>
+                <span className="text-sm text-slate-800 dark:text-slate-100">{option}</span>
               </label>
             ))}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -112,19 +141,19 @@ export function IncidentFilters({ filters, setFilters }: IncidentFiltersProps) {
   const activeCount = filters.severities.length + filters.statuses.length + (filters.assigneeId ? 1 : 0);
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
+    <div className="flex flex-wrap items-center gap-2">
       {/* Search Input */}
-      <div className="relative flex-1 min-w-60">
+      <div className="relative flex-1 min-w-52">
         <input
           type="text"
           placeholder="Search by title or ID..."
-          className="w-full pl-4 pr-10 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+          className="w-full h-8 pl-3 pr-8 py-1.5 bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-white/10 rounded-lg text-sm text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
           value={filters.search}
           onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
         />
         {filters.search && (
            <X 
-            className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 cursor-pointer" 
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500 dark:text-slate-400 cursor-pointer" 
             onClick={() => setFilters(prev => ({ ...prev, search: "" }))}
            />
         )}
@@ -148,7 +177,7 @@ export function IncidentFilters({ filters, setFilters }: IncidentFiltersProps) {
 
       {/* Assignee Dropdown */}
       <select
-        className="h-9 rounded-md border border-slate-200 bg-white px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
+        className="h-8 rounded-md border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/70 px-2.5 py-1 text-sm text-slate-800 dark:text-slate-100 outline-none focus:ring-2 focus:ring-blue-500/20"
         value={filters.assigneeId || ""}
         onChange={(e) => setFilters(prev => ({ ...prev, assigneeId: e.target.value || null }))}
       >
@@ -163,7 +192,7 @@ export function IncidentFilters({ filters, setFilters }: IncidentFiltersProps) {
           variant="ghost" 
           size="sm" 
           onClick={clearFilters}
-          className="text-slate-500 hover:text-red-600 h-9"
+          className="text-slate-600 hover:text-red-600 h-8 dark:text-slate-400"
         >
           Clear All
         </Button>

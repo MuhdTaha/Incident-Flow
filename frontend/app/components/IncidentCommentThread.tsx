@@ -81,35 +81,30 @@ export default function IncidentCommentThread({ incidentId, onCommentAdded }: In
   };
 
   return (
-    <div className="mt-6 border-t border-slate-100 pt-5 space-y-2">
-      {/* Typing indicator — reserves height so the layout doesn't jump */}
-      <div className="min-h-4.5">
+    <div className="flex items-end gap-2 py-2">
+      <div className="min-w-0 flex-1">
         {typingUser && (
-          <span className="text-xs text-slate-500 animate-pulse">
+          <p className="mb-1 text-xs text-slate-600 dark:text-slate-300 animate-pulse">
             {typingUser} is typing...
-          </span>
+          </p>
         )}
+        <Textarea
+          value={comment}
+          onChange={handleTyping}
+          placeholder="Add a comment..."
+          rows={1}
+          className="min-h-9 resize-none text-sm text-slate-800 dark:text-slate-100"
+        />
       </div>
-
-      <Textarea
-        value={comment}
-        onChange={handleTyping}
-        placeholder="Add a comment..."
-        rows={3}
-        className="resize-none text-sm"
-      />
-
-      <div className="flex justify-end">
-        <Button
-          size="sm"
-          onClick={handleSubmit}
-          disabled={submitting || !comment.trim()}
-          className="gap-2"
-        >
-          <Send className="h-3.5 w-3.5" />
-          {submitting ? "Posting..." : "Post Comment"}
-        </Button>
-      </div>
+      <Button
+        size="sm"
+        onClick={handleSubmit}
+        disabled={submitting || !comment.trim()}
+        className="h-9 shrink-0 gap-2"
+      >
+        <Send className="h-3.5 w-3.5" />
+        {submitting ? "Posting..." : "Post"}
+      </Button>
     </div>
   );
 }

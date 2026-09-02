@@ -13,6 +13,7 @@ import {
   ResponsiveContainer 
 } from 'recharts';
 import { Clock, TrendingUp, Loader2, Zap, AlertOctagon } from "lucide-react";
+import { useTheme } from "@/context/ThemeContext";
 import {
   Select,
   SelectContent,
@@ -35,6 +36,10 @@ export default function MetricsDashboard() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState("30"); // Default to 30 days
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  const axisFill = isDark ? "#94a3b8" : "#475569";
+  const gridStroke = isDark ? "#1e3a5f" : "#e2e8f0";
 
   // useCallback prevents unnecessary re-renders when the dependency changes
   const fetchData = useCallback(async (timeWindow: string) => {
@@ -64,7 +69,7 @@ export default function MetricsDashboard() {
       {/* Time Filter Control */}
       <div className="flex justify-end">
         <Select value={days} onValueChange={setDays}>
-          <SelectTrigger className="w-[180px] bg-white">
+          <SelectTrigger className="w-[180px] bg-white dark:bg-slate-900/70 dark:border-white/10">
             <SelectValue placeholder="Select Timeframe" />
           </SelectTrigger>
           <SelectContent>
@@ -76,7 +81,7 @@ export default function MetricsDashboard() {
       </div>
 
       {loading && !data ? (
-        <div className="flex items-center gap-2 justify-center py-12 text-slate-500">
+        <div className="flex items-center gap-2 justify-center py-12 text-slate-600 dark:text-slate-400">
           <Loader2 className="animate-spin h-5 w-5"/> Loading Analytics...
         </div>
       ) : !data ? (
@@ -84,62 +89,62 @@ export default function MetricsDashboard() {
       ) : (
         <>
           {/* Top Row: KPIs */}
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-3">
             
             {/* KPI: MTTR */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-slate-500">
+            <Card className="gap-0 py-3">
+              <CardHeader className="flex flex-row items-center justify-between pb-1">
+                <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">
                   Mean Time to Resolve (MTTR)
                 </CardTitle>
                 <Clock className="h-4 w-4 text-blue-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-slate-900">
-                  {data.mttr_hours} <span className="text-lg font-normal text-slate-500">hrs</span>
+                <div className="text-2xl font-bold text-slate-900 dark:text-slate-50">
+                  {data.mttr_hours} <span className="text-base font-normal text-slate-600 dark:text-slate-400">hrs</span>
                 </div>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
                   Creation to Resolution
                 </p>
               </CardContent>
             </Card>
 
             {/* KPI: MTTA */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-slate-500">
+            <Card className="gap-0 py-3">
+              <CardHeader className="flex flex-row items-center justify-between pb-1">
+                <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">
                   Mean Time to Acknowledge (MTTA)
                 </CardTitle>
                 <Zap className="h-4 w-4 text-amber-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-slate-900">
-                  {data.mtta_minutes} <span className="text-lg font-normal text-slate-500">mins</span>
+                <div className="text-2xl font-bold text-slate-900 dark:text-slate-50">
+                  {data.mtta_minutes} <span className="text-base font-normal text-slate-600 dark:text-slate-400">mins</span>
                 </div>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
                   Creation to First Status Change
                 </p>
               </CardContent>
             </Card>
 
             {/* KPI: SLA Breaches */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-slate-500">
+            <Card className="gap-0 py-3">
+              <CardHeader className="flex flex-row items-center justify-between pb-1">
+                <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">
                   SLA Breach Rate
                 </CardTitle>
                 <AlertOctagon className={`h-4 w-4 ${data.sla_breach_rate > 10 ? 'text-red-500' : 'text-emerald-500'}`} />
               </CardHeader>
               <CardContent>
                 <div className="flex items-baseline gap-2">
-                  <div className={`text-3xl font-bold ${data.sla_breach_rate > 10 ? 'text-red-600' : 'text-slate-900'}`}>
+                  <div className={`text-2xl font-bold ${data.sla_breach_rate > 10 ? 'text-red-600' : 'text-slate-900 dark:text-slate-50'}`}>
                     {data.sla_breach_rate}%
                   </div>
-                  <span className="text-sm font-medium text-slate-500">
+                  <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
                     ({data.total_breaches} incidents)
                   </span>
                 </div>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
                   Incidents exceeding SLA thresholds
                 </p>
               </CardContent>
@@ -148,27 +153,27 @@ export default function MetricsDashboard() {
           </div>
 
           {/* Bottom Row: Volume Trend Chart */}
-          <Card>
+          <Card className="gap-0">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-slate-500">
+                <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">
                     Incident Volume (Last {days} Days)
                 </CardTitle>
                 <TrendingUp className="h-4 w-4 text-emerald-500" />
               </div>
             </CardHeader>
-            <CardContent className="h-[250px] w-full">
+            <CardContent className="h-[210px] w-full">
               {data.volume_trend.length === 0 ? (
-                <div className="h-full flex items-center justify-center text-slate-400 text-sm">
+                <div className="h-full flex items-center justify-center text-slate-600 dark:text-slate-400 text-sm">
                   No incident data for this period.
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={data.volume_trend}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridStroke} />
                     <XAxis 
                       dataKey="date" 
-                      tick={{fontSize: 12, fill: '#64748b'}} 
+                      tick={{fontSize: 12, fill: axisFill}} 
                       axisLine={false}
                       tickLine={false}
                       // For > 7 days, showing a short date is better than day of the week
@@ -181,21 +186,27 @@ export default function MetricsDashboard() {
                     />
                     <YAxis 
                       allowDecimals={false} 
-                      tick={{fontSize: 12, fill: '#64748b'}} 
+                      tick={{fontSize: 12, fill: axisFill}} 
                       axisLine={false}
                       tickLine={false}
                     />
                     <Tooltip 
-                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                      contentStyle={{
+                        borderRadius: "12px",
+                        border: isDark ? "1px solid rgba(255,255,255,0.1)" : "none",
+                        background: isDark ? "#0f172a" : "#fff",
+                        color: isDark ? "#e2e8f0" : "#0f172a",
+                        boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                      }}
                       labelFormatter={(label) => new Date(label).toLocaleDateString()}
                     />
                     <Line 
                       type="monotone" 
                       dataKey="count" 
                       name="Incidents"
-                      stroke="#3b82f6" 
+                      stroke="#2563eb" 
                       strokeWidth={3} 
-                      dot={days === "7" ? { r: 4, fill: "#3b82f6", strokeWidth: 2, stroke: "#fff" } : false}
+                      dot={days === "7" ? { r: 4, fill: "#06b6d4", strokeWidth: 2, stroke: "#fff" } : false}
                       activeDot={{ r: 6 }}
                     />
                   </LineChart>

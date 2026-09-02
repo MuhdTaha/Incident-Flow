@@ -168,7 +168,7 @@ export default function AttachmentManager({ incidentId, onAttachmentChange }: At
       <div 
         className={`
           border-2 border-dashed rounded-lg p-8 text-center transition-colors
-          ${isDragging ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:bg-slate-50"}
+          ${isDragging ? "border-blue-500 bg-blue-50 dark:bg-blue-500/10" : "border-blue-300 bg-gradient-to-br from-blue-50 to-cyan-50 shadow-md shadow-blue-500/10 hover:border-blue-400 hover:shadow-lg hover:shadow-blue-500/15 dark:border-cyan-500/30 dark:bg-none dark:from-transparent dark:to-transparent dark:shadow-none dark:hover:bg-white/5"}
           ${status === "UPLOADING" || status === "SIGNING" ? "pointer-events-none opacity-50" : ""}
         `}
         onDragOver={onDragOver}
@@ -178,12 +178,12 @@ export default function AttachmentManager({ incidentId, onAttachmentChange }: At
         <div className="flex flex-col items-center gap-3">
           {status === "IDLE" || status === "SUCCESS" || status === "ERROR" ? (
             <>
-              <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center">
-                <UploadCloud className="h-6 w-6 text-slate-500" />
+              <div className="h-12 w-12 rounded-full bg-gradient-to-br from-blue-500 to-cyan-400 shadow-md shadow-blue-500/30 flex items-center justify-center">
+                <UploadCloud className="h-6 w-6 text-white" />
               </div>
               <div>
-                <p className="font-medium text-slate-900">Click to upload or drag and drop</p>
-                <p className="text-sm text-slate-500">SVG, PNG, JPG or PDF (max 10MB)</p>
+                <p className="font-medium text-slate-900 dark:text-slate-100">Click to upload or drag and drop</p>
+                <p className="text-sm text-slate-600 dark:text-slate-300">SVG, PNG, JPG or PDF (max 10MB)</p>
               </div>
               <input 
                 type="file" 
@@ -192,7 +192,7 @@ export default function AttachmentManager({ incidentId, onAttachmentChange }: At
                 onChange={onFileSelect}
               />
               <label htmlFor="file-upload">
-                <Button variant="outline" size="sm" className="mt-2 pointer-events-auto" asChild>
+                <Button variant="outline" size="sm" className="mt-2 pointer-events-auto border-blue-300 text-blue-700 shadow-sm shadow-blue-500/10 hover:bg-blue-50 dark:border-cyan-500/30 dark:text-cyan-200 dark:hover:bg-cyan-500/10" asChild>
                   <span>Browse Files</span>
                 </Button>
               </label>
@@ -200,7 +200,7 @@ export default function AttachmentManager({ incidentId, onAttachmentChange }: At
           ) : (
             /* PROGRESS STATE */
             <div className="w-full max-w-xs space-y-2">
-              <div className="flex justify-between text-sm font-medium">
+              <div className="flex justify-between text-sm font-medium text-slate-800 dark:text-slate-100">
                 <span>{status === "SIGNING" ? "Preparing..." : "Uploading..."}</span>
                 <span>{progress}%</span>
               </div>
@@ -210,12 +210,12 @@ export default function AttachmentManager({ incidentId, onAttachmentChange }: At
 
           {/* SUCCESS / ERROR MESSAGES */}
           {status === "SUCCESS" && (
-             <div className="text-emerald-600 flex items-center gap-2 text-sm font-medium mt-2">
+             <div className="text-emerald-600 dark:text-emerald-400 flex items-center gap-2 text-sm font-medium mt-2">
                 <CheckCircle2 className="h-4 w-4" /> Upload Complete
              </div>
           )}
           {error && (
-             <div className="text-red-600 flex items-center gap-2 text-sm font-medium mt-2">
+             <div className="text-red-600 dark:text-red-400 flex items-center gap-2 text-sm font-medium mt-2">
                 <X className="h-4 w-4" /> {error}
              </div>
           )}
@@ -224,16 +224,16 @@ export default function AttachmentManager({ incidentId, onAttachmentChange }: At
 
       {/* --- GALLERY AREA --- */}
       <div>
-        <h3 className="text-sm font-semibold text-slate-900 mb-4">
+        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-4">
           Attachments ({attachments?.length || 0})
         </h3>
         
         {loadingList ? (
-          <div className="flex items-center gap-2 text-slate-500">
+          <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
              <Loader2 className="h-4 w-4 animate-spin" /> Loading files...
           </div>
         ) : attachments.length === 0 ? (
-          <p className="text-sm text-slate-500 italic">No files attached yet.</p>
+          <p className="text-sm text-slate-600 dark:text-slate-300 italic">No files attached yet.</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {attachments.map((att) => (
@@ -242,10 +242,10 @@ export default function AttachmentManager({ incidentId, onAttachmentChange }: At
                   {getFileIcon(att.file_name)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-900 truncate" title={att.file_name}>
+                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate" title={att.file_name}>
                     {att.file_name}
                   </p>
-                  <p className="text-xs text-slate-500 truncate">
+                  <p className="text-xs text-slate-600 dark:text-slate-300 truncate">
                     by {att.uploaded_by} • {new Date(att.created_at).toLocaleDateString()}
                   </p>
                 </div>
@@ -253,7 +253,7 @@ export default function AttachmentManager({ incidentId, onAttachmentChange }: At
                 <div className="flex items-center gap-1 shrink-0">
                   <Button variant="ghost" size="icon" asChild>
                     <a href={att.file_url} target="_blank" rel="noopener noreferrer" title="View">
-                      <ExternalLink className="h-4 w-4 text-slate-500" />
+                      <ExternalLink className="h-4 w-4 text-slate-500 dark:text-slate-300" />
                     </a>
                   </Button>
 
@@ -261,7 +261,7 @@ export default function AttachmentManager({ incidentId, onAttachmentChange }: At
                     variant="ghost" 
                     size="icon" 
                     onClick={() => handleDownload(att.file_url, att.file_name)}
-                    className="text-green-500 hover:text-green-600 hover:bg-green-50 cursor-pointer"
+                    className="text-green-500 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-500/10 cursor-pointer"
                     title="Download"
                   >
                     <Download className="h-4 w-4 text-green-500" />
@@ -273,7 +273,7 @@ export default function AttachmentManager({ incidentId, onAttachmentChange }: At
                         size="icon" 
                         onClick={() => handleDelete(att.id)}
                         disabled={deletingId === att.id}
-                        className="text-red-500 hover:text-red-600 hover:bg-red-50 cursor-pointer"
+                        className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 cursor-pointer"
                         title="Delete"
                     >
                       {deletingId === att.id ? (

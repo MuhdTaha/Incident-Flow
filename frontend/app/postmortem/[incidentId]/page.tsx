@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import ReactMarkdown, { Components } from "react-markdown";
 import { authFetch } from "@/lib/api";
+import { AppShell } from "@/app/components/AppShell";
 
 interface CodeProps {
   children?: React.ReactNode;
@@ -158,48 +159,47 @@ export default function PostMortemPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-linear-to-b from-slate-50 to-slate-100 flex items-center justify-center p-4">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-          <p className="text-slate-700 font-medium">Loading post-mortem report...</p>
+      <AppShell>
+        <div className="flex min-h-[60vh] items-center justify-center">
+          <div className="text-center">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+            <p className="text-slate-700 dark:text-slate-200 font-medium">Loading post-mortem report...</p>
+          </div>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-linear-to-b from-slate-50 to-slate-100 flex items-center justify-center p-4">
-        <div className="mx-auto max-w-md rounded-lg border border-red-300 bg-red-50 p-6 text-center">
+      <AppShell>
+        <div className="mx-auto max-w-md rounded-2xl border border-red-200 bg-red-50/80 p-6 text-center shadow-xl backdrop-blur-md dark:border-red-500/30 dark:bg-red-500/10">
           <div className="mb-3 text-3xl">⚠️</div>
           <p className="text-red-800 font-medium mb-2">Failed to Load Report</p>
           <p className="text-red-700 text-sm">{error}</p>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   return (
-    <main className="min-h-screen bg-linear-to-b from-slate-50 to-slate-100 py-12 px-4">
-      <article className="mx-auto max-w-4xl rounded-xl border border-slate-300 bg-white shadow-lg">
-        {/* Header */}
-        <div className="bg-linear-to-r from-slate-900 to-slate-800 px-8 py-6 rounded-t-xl">
+    <AppShell>
+      <article className="mx-auto max-w-4xl overflow-hidden rounded-2xl border border-slate-200/70 bg-white/75 shadow-xl shadow-blue-950/5 backdrop-blur-md dark:border-white/10 dark:bg-slate-900/60">
+        <div className="bg-gradient-to-r from-slate-950 via-blue-950 to-cyan-900 px-8 py-6">
           <h1 className="text-3xl font-bold text-white">Incident Post-Mortem Report</h1>
-          <p className="mt-2 text-slate-300 text-sm">Incident ID: <span className="font-mono font-semibold">{incidentId}</span></p>
+          <p className="mt-2 text-cyan-100/80 text-sm">Incident ID: <span className="font-mono font-semibold">{incidentId}</span></p>
         </div>
 
-        {/* Content */}
         <div className="p-8 max-w-none">
           <ReactMarkdown components={markdownComponents}>
             {markdown}
           </ReactMarkdown>
         </div>
 
-        {/* Footer */}
-        <div className="border-t border-slate-200 bg-slate-50 px-8 py-4 rounded-b-xl text-sm text-slate-500">
+        <div className="border-t border-slate-200/70 dark:border-white/10 bg-blue-50/40 dark:bg-blue-500/10 px-8 py-4 text-sm text-slate-500 dark:text-slate-400">
           Generated: {new Date().toLocaleString()}
         </div>
       </article>
-    </main>
+    </AppShell>
   );
 }

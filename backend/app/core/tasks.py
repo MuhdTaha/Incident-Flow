@@ -7,7 +7,6 @@ from datetime import datetime, timedelta, timezone
 from mailjet_rest import Client
 
 from app.core.celery_app import celery
-from app.core.constants import SYSTEM_BOT_ID
 from app.db.session import SessionLocal
 import app.db.models as models
 
@@ -93,6 +92,7 @@ def check_sla_breaches(self):
   db = SessionLocal()
   now = datetime.now(timezone.utc)
   escalated_count = 0
+  pending_emails = []
   
   try:
     # 1. Fetch all incidents that are in "DETECTED" status
@@ -100,7 +100,10 @@ def check_sla_breaches(self):
     
     for incident in active_incidents:
       sla_treshold = SLA_TRESHOLDS.get(incident.severity)
-      if sla_treshold and (now - incident.created_at.replace(tzinfo=timezone.utc)) > sla_treshold:
+      created_at = incident.created_at
+      if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=timezone.utc)
+      if sla_treshold and (now - created_at) > sla_treshold:
         
         print(f"⚠️ SLA Breach detected for Incident ID: {incident.id}")
         
@@ -111,12 +114,12 @@ def check_sla_breaches(self):
         # Create an audit log for this change
         audit_log = models.IncidentEvent(
           incident_id=incident.id,
-          actor_id=SYSTEM_BOT_ID,
+          actor_id=None,  # system event; SYSTEM_BOT_ID is not guaranteed to exist
           organization_id=incident.organization_id,
           event_type="SLA_BREACH",
-          old_value=old_status,
-          new_value=models.IncidentStatus.ESCALATED,
-          comment=f"Auto-escalated: {incident.severity} incident breached SLA of {sla_treshold}."
+          old_value=old_status.value,
+          new_value=models.IncidentStatus.ESCALATED.value,
+          comment=f"Auto-escalated: {incident.severity.value} incident breached SLA of {sla_treshold}."
         )
 
         db.add(audit_log)
@@ -135,18 +138,23 @@ def check_sla_breaches(self):
         recipients.extend(admin_emails)
 
         for email in set(recipients):
-          send_incident_alert_email.delay(
-            to_email=email,
-            incident_title=f"SLA BREACH: {incident.title}",
-            incident_id=str(incident.id),
-            severity=str(incident.severity)
-          )
+          pending_emails.append({
+            "to_email": email,
+            "incident_title": f"SLA BREACH: {incident.title}",
+            "incident_id": str(incident.id),
+            "severity": incident.severity.value,
+          })
 
         escalated_count += 1
 
     db.commit()
+
+    for payload in pending_emails:
+      send_incident_alert_email.delay(**payload)
+
     return f"Escalated {escalated_count} incidents due to SLA breaches."
   except Exception as e:
+    db.rollback()
     logger.exception("SLA breach check failed: %s", e)
     raise
   finally:

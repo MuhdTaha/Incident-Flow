@@ -1,10 +1,12 @@
-  "use client";
+"use client";
 
 import { useEffect, useState } from "react";
-import { Activity, Building2 } from "lucide-react";
+import { Building2 } from "lucide-react";
 import UserNav from "./UserNav";
 import { authFetch } from "@/lib/api";
 import Link from "next/link";
+import { BrandMark } from "./BrandMark";
+import { ThemeToggle } from "./ThemeToggle";
 
 export default function AppHeader() {
   const [orgName, setOrgName] = useState<string>("");
@@ -29,30 +31,25 @@ export default function AppHeader() {
   }, []);
 
   return (
-    <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-200/60 bg-slate-50/50 pt-2 sticky top-0 z-10">
-      <div className="flex items-center gap-6">
-        {/* Logo Block - Clickable to Home */}
-        <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-          <div className="bg-slate-900 p-2 rounded-lg shadow-sm">
-            <Activity className="h-6 w-6 text-white" />
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+    <header className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-blue-100/70 dark:border-white/10">
+      <div className="flex items-center gap-4">
+        <Link href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+          <BrandMark />
+          <h1 className="text-lg font-bold tracking-tight text-slate-900 dark:text-slate-50">
             IncidentFlow
           </h1>
         </Link>
 
-        {/* Divider */}
-        <div className="h-8 w-px bg-slate-300 hidden md:block" />
+        <div className="h-6 w-px bg-blue-100 dark:bg-white/10 hidden md:block" />
 
-        {/* Organization Context */}
         <div className="flex flex-col">
-          <div className="flex items-center gap-2 text-slate-500">
-            <Building2 className="h-4 w-4" />
-            <span className="text-xs font-semibold uppercase tracking-wider">Organization</span>
+          <div className="flex items-center gap-1.5 text-cyan-800 dark:text-cyan-300">
+            <Building2 className="h-3.5 w-3.5" />
+            <span className="text-[10px] font-semibold uppercase tracking-[0.16em]">Workspace</span>
           </div>
-          <div className="font-semibold text-slate-900 text-lg leading-tight h-6">
+          <div className="font-semibold text-slate-900 dark:text-slate-50 text-sm leading-tight h-5">
             {loading ? (
-               <span className="inline-block h-4 w-24 bg-slate-200 animate-pulse rounded"></span>
+               <span className="inline-block h-4 w-24 bg-blue-100 dark:bg-blue-500/20 animate-pulse rounded"></span>
             ) : (
                orgName
             )}
@@ -60,8 +57,8 @@ export default function AppHeader() {
         </div>
       </div>
 
-      {/* User Navigation */}
-      <div className="flex items-center gap-4"> 
+      <div className="flex items-center gap-3">
+        <ThemeToggle />
         <UserNav />
       </div>
     </header>

@@ -24,6 +24,7 @@ import EditUserModal from "../components/EditUserModal";
 import UserStatsModal from "../components/UserStatsModal"; 
 import MetricsDashboard from "../components/MetricsDashboard";
 import AppHeader from "../components/AppHeader";
+import { AppShell } from "../components/AppShell";
 
 
 export type DetailedUserStat = {
@@ -103,74 +104,82 @@ export default function AdminDashboard() {
   };
 
   if (authLoading || profileLoading || (isAdmin && loading)) {
-    return <div className="p-8">Loading Admin Panel...</div>;
+    return (
+      <AppShell>
+        <p className="text-slate-600 dark:text-slate-400">Loading Admin Panel...</p>
+      </AppShell>
+    );
   }
   if (!isAdmin) return null;
-  if (!stats) return <div className="p-8">Error loading stats.</div>;
+  if (!stats) {
+    return (
+      <AppShell>
+        <p className="text-slate-600 dark:text-slate-400">Error loading stats.</p>
+      </AppShell>
+    );
+  }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-8">
-      {/* Header Section */}
+    <AppShell>
       <AppHeader />
 
-      {/* Title Section */}
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">Admin Console</h1>
-        <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-medium">
+        <div>
+          <p className="text-sm font-medium text-blue-600 dark:text-cyan-400">Admin</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50">Admin Console</h1>
+        </div>
+        <span className="px-3 py-1 bg-cyan-50 text-cyan-800 rounded-full text-sm font-medium border border-cyan-100 dark:bg-cyan-500/15 dark:text-cyan-200 dark:border-cyan-500/20">
           Organization View
         </span>
       </div>
 
-      {/* Analytics Section */}
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-slate-900">Performance Metrics</h2>
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Performance Metrics</h2>
         <MetricsDashboard />
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
-            <Users className="h-4 w-4 text-slate-500" />
+      <div className="grid gap-3 md:grid-cols-3">
+        <Card className="gap-0 py-3">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+            <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">Total Employees</CardTitle>
+            <Users className="h-4 w-4 text-cyan-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.total_users}</div>
+            <div className="text-xl font-bold text-slate-900 dark:text-slate-50">{stats.total_users}</div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Incidents</CardTitle>
-            <Activity className="h-4 w-4 text-emerald-500" />
+        <Card className="gap-0 py-3">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+            <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">Active Incidents</CardTitle>
+            <Activity className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.active_incidents}</div>
-            <p className="text-xs text-slate-500">
+            <div className="text-xl font-bold text-slate-900 dark:text-slate-50">{stats.active_incidents}</div>
+            <p className="text-xs text-slate-600 dark:text-slate-400">
               {stats.total_incidents} lifetime incidents
             </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Critical (SEV1)</CardTitle>
+        <Card className="gap-0 py-3">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+            <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">Critical (SEV1)</CardTitle>
             <AlertTriangle className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">
+            <div className="text-xl font-bold text-red-600">
               {stats.incidents_by_severity["SEV1"] || 0}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* User Management Table */}
-      <div className="rounded-md border bg-white shadow overflow-hidden">
-        <div className="p-4 border-b bg-slate-50">
-          <h3 className="font-semibold text-slate-800">Team Performance & Management</h3>
-          <p className="text-sm text-slate-500">Click a row to view detailed individual stats.</p>
-        </div>
+      <Card className="gap-0 py-0 overflow-hidden">
+        <CardHeader className="border-b border-slate-200/70 dark:border-white/10 bg-white/40 dark:bg-white/5 pt-4 pb-3">
+          <CardTitle className="text-base font-semibold text-slate-800 dark:text-slate-100">Team Performance & Management</CardTitle>
+          <p className="text-sm text-slate-600 dark:text-slate-400">Click a row to view detailed individual stats.</p>
+        </CardHeader>
         <Table>
           <TableHeader>
             <TableRow>
@@ -186,21 +195,21 @@ export default function AdminDashboard() {
             {stats.user_performance.map((u) => (
               <TableRow 
                 key={u.id} 
-                className="cursor-pointer hover:bg-slate-50 transition-colors"
+                className="cursor-pointer hover:bg-cyan-50/50 dark:hover:bg-cyan-500/10 transition-colors"
                 onClick={() => handleRowClick(u)}
               >
                 <TableCell className="font-medium">{u.full_name}</TableCell>
-                <TableCell className="text-slate-500">{u.email}</TableCell>
+                <TableCell className="text-slate-600 dark:text-slate-400">{u.email}</TableCell>
                 <TableCell className="text-center">
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                    ${u.role === 'ADMIN' ? 'bg-purple-100 text-purple-800' : 
-                      u.role === 'MANAGER' ? 'bg-blue-100 text-blue-800' : 
-                      'bg-slate-100 text-slate-800'}`}>
+                    ${u.role === 'ADMIN' ? 'bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-200' : 
+                      u.role === 'MANAGER' ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-500/20 dark:text-cyan-200' : 
+                      'bg-slate-100 text-slate-800 dark:bg-white/10 dark:text-slate-200'}`}>
                     {u.role || "ENGINEER"} 
                   </span>
                 </TableCell>
                 <TableCell className="text-center">{u.assigned_count}</TableCell>
-                <TableCell className="text-center text-emerald-600 font-medium">{u.resolved_count}</TableCell>
+                <TableCell className="text-center text-emerald-600 dark:text-emerald-400 font-medium">{u.resolved_count}</TableCell>
                 <TableCell className="text-center">
                   <div className="flex items-center justify-center space-x-2">
                     <Button 
@@ -218,14 +227,14 @@ export default function AdminDashboard() {
             ))}
             {stats.user_performance.length === 0 && (
               <TableRow>
-                 <TableCell colSpan={6} className="h-24 text-center text-slate-500">
+                 <TableCell colSpan={6} className="h-24 text-center text-slate-600 dark:text-slate-400">
                     No users found in this organization.
                  </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
-      </div>
+      </Card>
 
       {/* Edit User Settings Modal */}
       {/* Ensure your EditUserModal is updated to accept DetailedUserStat if it needs those properties */}
@@ -243,6 +252,6 @@ export default function AdminDashboard() {
         onClose={() => setIsStatsModalOpen(false)}
       />
 
-    </div>
+    </AppShell>
   );
 }
