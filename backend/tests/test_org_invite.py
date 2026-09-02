@@ -1,6 +1,7 @@
 import uuid
 from app.main import app
 from app.api.deps import get_current_user
+from app.core.supabase_admin import EmailAlreadyRegistered
 from app.db.models import User, UserRole, Organization
 
 
@@ -52,7 +53,24 @@ def test_invite_rejects_duplicate_email(client, db):
   )
 
   assert response.status_code == 409
-  assert "already exists" in response.json()["detail"].lower()
+  assert "already in your workspace" in response.json()["detail"].lower()
+  app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_invite_rejects_email_in_other_org(client, db):
+  other = _create_org(db, "Other Co", "other-co")
+  org = _create_org(db, "This Co", "this-co")
+  admin = _create_user(db, org.id, UserRole.ADMIN, "admin@this.com")
+  _create_user(db, other.id, UserRole.ENGINEER, "taken@company.com")
+  app.dependency_overrides[get_current_user] = lambda: admin
+
+  response = client.post(
+    "/api/v1/orgs/invite",
+    json={"email": "taken@company.com", "role": "ENGINEER"},
+  )
+
+  assert response.status_code == 409
+  assert "another organization" in response.json()["detail"].lower()
   app.dependency_overrides.pop(get_current_user, None)
 
 
@@ -140,4 +158,43 @@ def test_invite_501_when_anon_key(client, db, monkeypatch):
 
   assert response.status_code == 501
   assert "publishable" in response.json()["detail"].lower()
+  app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_invite_attaches_existing_auth_user(client, db, monkeypatch):
+  org = _create_org(db, "Attach Org", "attach-org")
+  admin = _create_user(db, org.id, UserRole.ADMIN, "admin-attach@invite.com")
+  auth_id = uuid.uuid4()
+  sent = {}
+
+  def fake_invite(email, redirect_to, user_metadata=None):
+    raise EmailAlreadyRegistered(email)
+
+  def fake_lookup(email):
+    return str(auth_id)
+
+  def fake_link(email, redirect_to):
+    sent["email"] = email
+    sent["redirect_to"] = redirect_to
+
+  monkeypatch.setenv("FRONTEND_URL", "https://app.example")
+  monkeypatch.setattr("app.services.org_service.invite_user_by_email", fake_invite)
+  monkeypatch.setattr("app.services.org_service.get_auth_user_id_by_email", fake_lookup)
+  monkeypatch.setattr("app.services.org_service.send_login_link", fake_link)
+
+  app.dependency_overrides[get_current_user] = lambda: admin
+  response = client.post(
+    "/api/v1/orgs/invite",
+    json={"email": "Existing.User@Company.com", "role": "ENGINEER"},
+  )
+
+  assert response.status_code == 200
+  assert response.json()["user_id"] == str(auth_id)
+  assert sent["email"] == "existing.user@company.com"
+  assert sent["redirect_to"] == "https://app.example/invite"
+
+  created = db.query(User).filter(User.id == auth_id).first()
+  assert created is not None
+  assert created.organization_id == org.id
+  assert created.email == "existing.user@company.com"
   app.dependency_overrides.pop(get_current_user, None)

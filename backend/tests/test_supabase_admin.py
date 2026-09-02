@@ -3,7 +3,11 @@ from unittest.mock import Mock
 
 import pytest
 
-from app.core.supabase_admin import invite_user_by_email, supabase_admin_config
+from app.core.supabase_admin import (
+  EmailAlreadyRegistered,
+  invite_user_by_email,
+  supabase_admin_config,
+)
 
 
 def test_invite_posts_to_gotrue(monkeypatch):
@@ -68,6 +72,28 @@ def test_invite_http_error_surfaces_body(monkeypatch):
 
   with pytest.raises(RuntimeError, match="401"):
     invite_user_by_email("a@b.com", "http://localhost:3000/invite")
+
+
+def test_invite_422_email_exists_is_typed(monkeypatch):
+  def fake_post(url, headers=None, json=None, timeout=None):
+    response = Mock()
+    response.status_code = 422
+    response.content = b'{"code":422}'
+    response.text = '{"code":422,"error_code":"email_exists","msg":"A user with this email address has already been registered"}'
+    response.json.return_value = {
+      "code": 422,
+      "error_code": "email_exists",
+      "msg": "A user with this email address has already been registered",
+    }
+    response.reason_phrase = "Unprocessable Entity"
+    return response
+
+  monkeypatch.setenv("SUPABASE_URL", "https://abc.supabase.co")
+  monkeypatch.setenv("SUPABASE_KEY", "sb_secret_testkey")
+  monkeypatch.setattr("app.core.supabase_admin.httpx.post", fake_post)
+
+  with pytest.raises(EmailAlreadyRegistered):
+    invite_user_by_email("taken@company.com", "http://localhost:3000/invite")
 
 
 def test_config_message_is_generic():

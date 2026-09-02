@@ -40,7 +40,7 @@ The API resolves the user from Postgres and enforces `organization_id` on every 
 
 \* Uses token claims only — user row may not exist yet.
 
-Invite body: `{ "email": "alex@company.com", "role": "ENGINEER" }`. `role` is `ENGINEER` (default), `MANAGER`, or `ADMIN`. Duplicate emails return **409**. Missing Supabase service-role credentials return **501**. The invite email links to `{FRONTEND_URL}/invite` so the teammate can set a password and join this org.
+Invite body: `{ "email": "alex@company.com", "role": "ENGINEER" }`. `role` is `ENGINEER` (default), `MANAGER`, or `ADMIN`. Duplicate emails return **409** (already in this workspace, or already in another org — one account per email). If the address already exists in Supabase Auth but has no local org row, the API sends a magic link and attaches them to this org. Missing Supabase secret-key credentials return **501**. The email links to `{FRONTEND_URL}/invite`.
 
 ### Incidents — `/incidents`
 
@@ -90,7 +90,7 @@ Invite body: `{ "email": "alex@company.com", "role": "ENGINEER" }`. `role` is `E
 | 403 | Authenticated but wrong role |
 | 404 | Resource not found (includes cross-org access) |
 | 400 | Invalid FSM transition or business rule violation |
-| 409 | Duplicate email (org invite) |
+| 409 | Duplicate email (already in this workspace, or another org) |
 
 ## Example: invite a teammate (admin)
 
