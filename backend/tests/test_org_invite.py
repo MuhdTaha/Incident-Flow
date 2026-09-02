@@ -217,3 +217,109 @@ def test_invite_reinvites_orphaned_auth_user(client, db, monkeypatch):
   assert created.email == "existing.user@company.com"
   assert created.invite_pending is True
   app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_invite_resends_pending_teammate(client, db, monkeypatch):
+  org = _create_org(db, "Resend Org", "resend-org")
+  admin = _create_user(db, org.id, UserRole.ADMIN, "admin-resend@invite.com")
+  pending_id = uuid.uuid4()
+  pending = User(
+    id=pending_id,
+    email="alex@company.com",
+    full_name="Alex",
+    role=UserRole.ENGINEER,
+    invite_pending=True,
+    organization_id=org.id,
+  )
+  db.add(pending)
+  db.commit()
+  sent = []
+
+  monkeypatch.setattr(
+    "app.services.org_service.generate_invite_link",
+    lambda email, redirect_to, user_metadata=None: (
+      str(pending_id),
+      "https://example.supabase.co/auth/v1/verify?token=resend&type=invite",
+    ),
+  )
+  monkeypatch.setattr("app.services.org_service.send_org_invite_email", lambda *args: sent.append(args))
+
+  app.dependency_overrides[get_current_user] = lambda: admin
+  response = client.post(
+    "/api/v1/orgs/invite",
+    json={"email": "Alex@Company.com", "role": "MANAGER"},
+  )
+
+  assert response.status_code == 200
+  assert response.json()["user_id"] == str(pending_id)
+  assert sent
+  db.refresh(pending)
+  assert pending.invite_pending is True
+  assert pending.role == UserRole.MANAGER
+  assert db.query(User).filter(User.email == "alex@company.com").count() == 1
+  app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_invite_reuses_existing_auth_id(client, db, monkeypatch):
+  org = _create_org(db, "Reuse Id Org", "reuse-id-org")
+  admin = _create_user(db, org.id, UserRole.ADMIN, "admin-reuse@invite.com")
+  leftover_id = uuid.uuid4()
+  leftover = User(
+    id=leftover_id,
+    email="old-alias@company.com",
+    full_name="Old Alias",
+    role=UserRole.ENGINEER,
+    invite_pending=True,
+    organization_id=org.id,
+  )
+  db.add(leftover)
+  db.commit()
+  sent = []
+
+  monkeypatch.setattr(
+    "app.services.org_service.generate_invite_link",
+    lambda email, redirect_to, user_metadata=None: (
+      str(leftover_id),
+      "https://example.supabase.co/auth/v1/verify?token=reuse&type=invite",
+    ),
+  )
+  monkeypatch.setattr("app.services.org_service.send_org_invite_email", lambda *args: sent.append(args))
+
+  app.dependency_overrides[get_current_user] = lambda: admin
+  response = client.post(
+    "/api/v1/orgs/invite",
+    json={"email": "vipikix112@mapsguy.com", "role": "ENGINEER"},
+  )
+
+  assert response.status_code == 200
+  assert response.json()["user_id"] == str(leftover_id)
+  assert sent
+  db.refresh(leftover)
+  assert leftover.email == "vipikix112@mapsguy.com"
+  assert leftover.invite_pending is True
+  app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_invite_rejects_auth_id_linked_to_active_teammate(client, db, monkeypatch):
+  org = _create_org(db, "Active Id Org", "active-id-org")
+  admin = _create_user(db, org.id, UserRole.ADMIN, "admin-activeid@invite.com")
+  active = _create_user(db, org.id, UserRole.ENGINEER, "already-joined@company.com")
+
+  monkeypatch.setattr(
+    "app.services.org_service.generate_invite_link",
+    lambda email, redirect_to, user_metadata=None: (
+      str(active.id),
+      "https://example.supabase.co/auth/v1/verify?token=taken&type=invite",
+    ),
+  )
+  monkeypatch.setattr("app.services.org_service.send_org_invite_email", lambda *args: None)
+
+  app.dependency_overrides[get_current_user] = lambda: admin
+  response = client.post(
+    "/api/v1/orgs/invite",
+    json={"email": "someone-else@company.com", "role": "ENGINEER"},
+  )
+
+  assert response.status_code == 409
+  assert "already linked" in response.json()["detail"].lower()
+  app.dependency_overrides.pop(get_current_user, None)

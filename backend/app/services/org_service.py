@@ -2,6 +2,7 @@
 
 import os
 from uuid import UUID
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from app.db import models
@@ -110,15 +111,28 @@ class OrganizationService:
       user_metadata={"org_id": str(org_id)},
     )
 
-  def _reinvite_orphaned_auth_user(self, email: str, org_id: UUID) -> tuple[str, str]:
+  def _reinvite_orphaned_auth_user(
+    self,
+    email: str,
+    org_id: UUID,
+    *,
+    replacing_pending: bool = False,
+  ) -> tuple[str, str]:
     """Auth still has this email after a local delete. Remove the leftover login and invite again."""
     existing = self.repo.get_by_email(email)
-    self._raise_if_email_taken(existing, org_id)
+    if not (replacing_pending and existing and existing.invite_pending and existing.organization_id == org_id):
+      self._raise_if_email_taken(existing, org_id)
 
     auth_id = get_auth_user_id_by_email(email)
     if auth_id:
       existing_by_id = self.repo.get_by_id_global(UUID(str(auth_id)))
-      self._raise_if_email_taken(existing_by_id, org_id)
+      if not (
+        replacing_pending
+        and existing_by_id
+        and existing_by_id.invite_pending
+        and existing_by_id.organization_id == org_id
+      ):
+        self._raise_if_email_taken(existing_by_id, org_id)
       delete_auth_user(auth_id)
 
     try:
@@ -129,18 +143,20 @@ class OrganizationService:
         detail="This email is still registered in Auth. Delete it in the Supabase dashboard, then invite again.",
       ) from e
 
-  def invite_user(self, email: str, role: models.UserRole, org_id: UUID):
-    if role not in INVITABLE_ROLES:
-      raise HTTPException(status_code=400, detail="Role must be ENGINEER, MANAGER, or ADMIN")
-
-    email = str(email).strip().lower()
-    self._raise_if_email_taken(self.repo.get_by_email(email), org_id)
-
+  def _invite_or_reinvite(
+    self,
+    email: str,
+    org_id: UUID,
+    *,
+    replacing_pending: bool = False,
+  ) -> tuple[str, str]:
     try:
-      user_id, action_link = self._invite_via_supabase(email, org_id)
+      return self._invite_via_supabase(email, org_id)
     except EmailAlreadyRegistered:
       try:
-        user_id, action_link = self._reinvite_orphaned_auth_user(email, org_id)
+        return self._reinvite_orphaned_auth_user(
+          email, org_id, replacing_pending=replacing_pending
+        )
       except HTTPException:
         raise
       except RuntimeError as e:
@@ -154,31 +170,117 @@ class OrganizationService:
         detail=str(e),
       ) from e
 
+  def _email_invite(
+    self,
+    email: str,
+    org_id: UUID,
+    user_id: str,
+    action_link: str,
+    *,
+    rollback_auth: bool,
+  ) -> None:
     org = self.get_org(org_id)
     try:
       send_org_invite_email(email, org.name or "IncidentFlow", action_link)
     except Exception as e:
-      try:
-        delete_auth_user(str(user_id))
-      except RuntimeError:
-        pass
+      if rollback_auth:
+        try:
+          delete_auth_user(str(user_id))
+        except RuntimeError:
+          pass
       raise HTTPException(
         status_code=502,
         detail=f"Invite user was created but the email could not be sent: {e}",
       ) from e
 
+  def _insert_local_invitee(
+    self,
+    email: str,
+    role: models.UserRole,
+    org_id: UUID,
+    user_id: str,
+  ) -> UUID:
+    new_user = models.User(
+      id=UUID(str(user_id)),
+      email=email,
+      full_name=_display_name_from_email(email),
+      role=role,
+      invite_pending=True,
+      organization_id=org_id,
+    )
     try:
-      new_user = models.User(
-        id=UUID(str(user_id)),
-        email=email.lower(),
-        full_name=_display_name_from_email(email),
-        role=role,
-        invite_pending=True,
-        organization_id=org_id
-      )
       self.repo.add(new_user)
       self._commit()
       return new_user.id
-    except Exception as e:
+    except IntegrityError:
       self.db.rollback()
-      raise HTTPException(status_code=400, detail=f"Failed to create local user record: {str(e)}")
+      existing = self.repo.get_by_id_global(UUID(str(user_id))) or self.repo.get_by_email(email)
+      if (
+        existing
+        and existing.email.lower() == email
+        and existing.organization_id == org_id
+      ):
+        if not existing.invite_pending:
+          self._raise_if_email_taken(existing, org_id)
+        existing.role = role
+        existing.invite_pending = True
+        self._commit()
+        return existing.id
+      raise HTTPException(
+        status_code=409,
+        detail="This person is already in your workspace.",
+      )
+
+  def _upsert_local_invitee(
+    self,
+    user: models.User,
+    email: str,
+    role: models.UserRole,
+    org_id: UUID,
+    user_id: str,
+  ) -> UUID:
+    new_id = UUID(str(user_id))
+    if user.id != new_id:
+      self.repo.delete_entity(user)
+      self.db.flush()
+      return self._insert_local_invitee(email, role, org_id, user_id)
+
+    user.email = email
+    user.role = role
+    user.invite_pending = True
+    user.organization_id = org_id
+    self.repo.flush()
+    self._commit()
+    return user.id
+
+  def invite_user(self, email: str, role: models.UserRole, org_id: UUID):
+    if role not in INVITABLE_ROLES:
+      raise HTTPException(status_code=400, detail="Role must be ENGINEER, MANAGER, or ADMIN")
+
+    email = str(email).strip().lower()
+    existing = self.repo.get_by_email(email)
+    if existing:
+      if existing.organization_id != org_id or not existing.invite_pending:
+        self._raise_if_email_taken(existing, org_id)
+      user_id, action_link = self._invite_or_reinvite(
+        email, org_id, replacing_pending=True
+      )
+      self._email_invite(email, org_id, user_id, action_link, rollback_auth=False)
+      return self._upsert_local_invitee(existing, email, role, org_id, user_id)
+
+    user_id, action_link = self._invite_or_reinvite(email, org_id)
+    existing_by_id = self.repo.get_by_id_global(UUID(str(user_id)))
+    if existing_by_id:
+      if existing_by_id.email.lower() != email:
+        if not existing_by_id.invite_pending or existing_by_id.organization_id != org_id:
+          raise HTTPException(
+            status_code=409,
+            detail="This login is already linked to another teammate.",
+          )
+      elif not existing_by_id.invite_pending:
+        self._raise_if_email_taken(existing_by_id, org_id)
+      self._email_invite(email, org_id, user_id, action_link, rollback_auth=False)
+      return self._upsert_local_invitee(existing_by_id, email, role, org_id, user_id)
+
+    self._email_invite(email, org_id, user_id, action_link, rollback_auth=True)
+    return self._insert_local_invitee(email, role, org_id, user_id)
