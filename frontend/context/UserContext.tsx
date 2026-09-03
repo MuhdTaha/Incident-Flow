@@ -12,6 +12,7 @@ export type CurrentUser = {
   role: AppRole;
   org_id: string;
   full_name: string;
+  invite_pending?: boolean;
 };
 
 type DirectoryUser = {

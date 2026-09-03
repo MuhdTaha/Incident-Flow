@@ -31,6 +31,7 @@ import { useCurrentUser, useUserDirectory } from "@/context/UserContext";
 import { authFetch } from "@/lib/api";
 import { useIncidentPoll } from "@/hooks/useIncidentPoll";
 import InviteUsersDialog from "./components/InviteUsersDialog";
+import { consumeOpenInviteFlag } from "@/lib/auth-redirect";
 
 type Incident = {
   id: string;
@@ -48,7 +49,7 @@ export default function IncidentDashboard() {
   const router = useRouter();
   const { user } = useAuth();
   const { userMap, refreshUsers } = useUserDirectory();
-  const { isAdmin, loading: profileLoading } = useCurrentUser();
+  const { isAdmin, loading: profileLoading, currentUser } = useCurrentUser();
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
@@ -72,12 +73,13 @@ export default function IncidentDashboard() {
   }, [user, router]);
 
   useEffect(() => {
-    if (profileLoading) return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("invite") !== "1") return;
+    if (profileLoading || !currentUser) return;
+    if (!consumeOpenInviteFlag()) return;
     if (isAdmin) setInviteOpen(true);
-    router.replace("/");
-  }, [profileLoading, isAdmin, router]);
+    if (window.location.search.includes("invite=")) {
+      router.replace("/");
+    }
+  }, [profileLoading, currentUser, isAdmin, router]);
 
   const fetchIncidents = useCallback(async () => {
     setLoading(true);

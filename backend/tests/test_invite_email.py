@@ -43,6 +43,31 @@ def test_send_uses_mailjet_when_smtp_unset(monkeypatch):
   assert sent == [("alex@company.com", "k", "invites@incidentflow.email", "Join Acme on IncidentFlow")]
 
 
+def test_send_mailjet_rejects_unsuccessful_message(monkeypatch):
+  monkeypatch.delenv("SMTP_HOST", raising=False)
+  monkeypatch.setenv("MAILJET_API_KEY", "k")
+  monkeypatch.setenv("MAILJET_API_SECRET", "s")
+
+  class FakeResult:
+    status_code = 200
+
+    def json(self):
+      return {"Messages": [{"Status": "error", "Errors": [{"ErrorMessage": "blocked"}]}]}
+
+  class FakeClient:
+    def __init__(self, *args, **kwargs):
+      self.send = type("Send", (), {"create": staticmethod(lambda data: FakeResult())})()
+
+  monkeypatch.setattr("app.core.invite_email.Client", FakeClient)
+
+  try:
+    send_org_invite_email("blocked@example.com", "Acme", "https://app.example/invite")
+  except RuntimeError as exc:
+    assert "mailjet" in str(exc).lower()
+  else:
+    raise AssertionError("expected RuntimeError")
+
+
 def test_send_raises_when_unconfigured(monkeypatch):
   monkeypatch.delenv("SMTP_HOST", raising=False)
   monkeypatch.delenv("MAILJET_API_KEY", raising=False)

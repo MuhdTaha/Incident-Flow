@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -46,6 +46,14 @@ export default function InviteUsersDialog({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastInvited, setLastInvited] = useState<string | null>(null);
+  const [localDev, setLocalDev] = useState(false);
+  const inFlight = useRef(false);
+
+  useEffect(() => {
+    setLocalDev(
+      window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1",
+    );
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -58,6 +66,8 @@ export default function InviteUsersDialog({
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (inFlight.current) return;
+    inFlight.current = true;
     setLoading(true);
     setError(null);
 
@@ -79,6 +89,7 @@ export default function InviteUsersDialog({
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to send invite");
     } finally {
+      inFlight.current = false;
       setLoading(false);
     }
   };
@@ -100,7 +111,10 @@ export default function InviteUsersDialog({
           {lastInvited && (
             <div className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
               <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>Invite sent to {lastInvited}. They stay pending until they join from the email.</span>
+              <span>
+                Invite sent to {lastInvited}. They stay pending until they join from the email.
+                {localDev ? " Locally the message lands in Mailhog at http://localhost:8025, not Gmail." : ""}
+              </span>
             </div>
           )}
 

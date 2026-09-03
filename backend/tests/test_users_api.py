@@ -86,6 +86,7 @@ def test_get_me_returns_backend_role(client, auth_override, admin_user, test_org
     "role": "ADMIN",
     "org_id": str(test_organization.id),
     "full_name": admin_user.full_name,
+    "invite_pending": False,
   }
 
 

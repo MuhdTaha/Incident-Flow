@@ -164,6 +164,27 @@ def delete_auth_user(user_id: str) -> None:
   _raise_for_status(response, "delete user")
 
 
+def auth_confirmation_state(user_id: str) -> str:
+  """'confirmed', 'unconfirmed', or 'missing' for this Auth user id."""
+  base, headers = supabase_admin_config(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
+  try:
+    response = httpx.get(
+      f"{base}/auth/v1/admin/users/{user_id}",
+      headers=headers,
+      timeout=30,
+    )
+  except httpx.HTTPError as exc:
+    raise RuntimeError(f"Supabase user lookup failed: {exc}") from exc
+  if response.status_code in (404, 422):
+    return "missing"
+  _raise_for_status(response, "user lookup")
+  data = _json_body(response)
+  user = data.get("user") if isinstance(data.get("user"), dict) else data
+  if (user or {}).get("email_confirmed_at") or (user or {}).get("confirmed_at"):
+    return "confirmed"
+  return "unconfirmed"
+
+
 def get_auth_user_id_by_email(email: str) -> Optional[str]:
   base, headers = supabase_admin_config(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
   target = email.strip().lower()

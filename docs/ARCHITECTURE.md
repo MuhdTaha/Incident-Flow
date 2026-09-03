@@ -93,7 +93,7 @@ Attachments and post-mortems are **not** stored in Postgres:
 
 | Route | Purpose |
 |-------|---------|
-| `/` | Incident dashboard (list, filter, actions); `?invite=1` opens the invite dialog for admins |
+| `/` | Incident dashboard (list, filter, actions); after org create the invite dialog opens for admins |
 | `/admin` | Analytics, user metrics, **Invite teammate** (admin only) |
 | `/postmortem/[id]` | View / generate AI post-mortem |
 | `/login`, `/register` | Supabase auth + org onboarding |

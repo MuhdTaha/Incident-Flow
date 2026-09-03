@@ -300,6 +300,40 @@ def test_invite_reuses_existing_auth_id(client, db, monkeypatch):
   app.dependency_overrides.pop(get_current_user, None)
 
 
+def test_invite_resends_unconfirmed_teammate(client, db, monkeypatch):
+  org = _create_org(db, "Unconfirmed Org", "unconfirmed-org")
+  admin = _create_user(db, org.id, UserRole.ADMIN, "admin-unconfirmed@invite.com")
+  leftover = _create_user(db, org.id, UserRole.ENGINEER, "quvovuby@fxzig.com")
+  leftover.invite_pending = False
+  db.commit()
+  sent = []
+
+  monkeypatch.setattr(
+    "app.services.org_service.auth_confirmation_state",
+    lambda user_id: "unconfirmed",
+  )
+  monkeypatch.setattr(
+    "app.services.org_service.generate_invite_link",
+    lambda email, redirect_to, user_metadata=None: (
+      str(leftover.id),
+      "https://example.supabase.co/auth/v1/verify?token=again&type=invite",
+    ),
+  )
+  monkeypatch.setattr("app.services.org_service.send_org_invite_email", lambda *args: sent.append(args))
+
+  app.dependency_overrides[get_current_user] = lambda: admin
+  response = client.post(
+    "/api/v1/orgs/invite",
+    json={"email": "quvovuby@fxzig.com", "role": "ENGINEER"},
+  )
+
+  assert response.status_code == 200
+  assert sent
+  db.refresh(leftover)
+  assert leftover.invite_pending is True
+  app.dependency_overrides.pop(get_current_user, None)
+
+
 def test_invite_rejects_auth_id_linked_to_active_teammate(client, db, monkeypatch):
   org = _create_org(db, "Active Id Org", "active-id-org")
   admin = _create_user(db, org.id, UserRole.ADMIN, "admin-activeid@invite.com")

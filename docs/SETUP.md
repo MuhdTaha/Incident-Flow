@@ -39,7 +39,7 @@ cp frontend/.env.example frontend/.env
 |----------|-------------|
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | Supabase anon key |
-| `NEXT_PUBLIC_API_URL` | Local: `http://localhost:8000/api/v1`. Deployed: your Render API URL + `/api/v1` |
+| `NEXT_PUBLIC_API_URL` | Local: `http://localhost:8000/api/v1`. Deployed: your Render API URL + `/api/v1`. If this still points at Render while you use `localhost:3000`, invites hit production (no Mailhog). |
 
 ## 2. Start the stack
 
@@ -61,12 +61,13 @@ make seed        # populate demo incidents + audit timelines
 
 1. Open http://localhost:3000/register
 2. Sign up via Supabase (email/password)
-3. Enter an organization name — backend creates org + admin user
-4. After a short success screen, the dashboard opens an **invite teammates** dialog (`/?invite=1`)
-5. Invite by email (or skip); teammates can also be invited later from **Admin Console**
-6. Declare incidents from the dashboard
+3. Open the confirmation link in the email to continue (the app will not proceed from the “check your inbox” screen until you do)
+4. Enter an organization name — backend creates org + admin user
+5. After a short success screen, the dashboard opens an **invite teammates** dialog
+6. Invite by email (or skip); teammates can also be invited later from **Admin Console**
+7. Invitees open the link in their email, then set a name and password on `/invite`
 
-**Invited teammates:** the email from Supabase includes a link to `/invite`. They set a name and password, then land in the org they were invited to — they do not create a second workspace.
+**Invited teammates:** the invite email includes a link to `/invite`. They set a name and password, then land in the org they were invited to — they do not create a second workspace.
 
 In the Supabase dashboard, add these **Redirect URLs** (Authentication → URL Configuration):
 

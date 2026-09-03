@@ -1,40 +1,47 @@
 import { supabase } from "@/lib/supabase";
 
-// 1. Determine if we are running on the Server (Docker) or Client (Browser)
-const isServer = typeof window === 'undefined';
+function isLocalHostname(hostname: string): boolean {
+  return hostname === "localhost" || hostname === "127.0.0.1";
+}
 
-// 2. Select the correct Base URL
-// - Server: Talk directly to the "backend" container (internal Docker DNS)
-// - Client: Talk to "localhost" (your browser's network)
-const API_URL = process.env.NEXT_PUBLIC_API_URL ||
-  (isServer
-    ? (process.env.INTERNAL_API_URL || "http://backend:8000/api/v1")
-    : "http://localhost:8000/api/v1");
+/**
+ * Resolve the API base URL.
+ * A frontend/.env copied from production often still has the Render URL. When
+ * the UI is opened on localhost, always use the local API so invites hit
+ * Mailhog instead of the live workspace.
+ */
+export function getApiUrl(): string {
+  const configured = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
+  if (typeof window !== "undefined" && isLocalHostname(window.location.hostname)) {
+    if (!configured || !/(localhost|127\.0\.0\.1)/.test(configured)) {
+      return "http://localhost:8000/api/v1";
+    }
+  }
+  if (configured) return configured;
+  if (typeof window === "undefined") {
+    return process.env.INTERNAL_API_URL || "http://backend:8000/api/v1";
+  }
+  return "http://localhost:8000/api/v1";
+}
 
-export { API_URL };
+export const API_URL = getApiUrl();
 
 export async function authFetch(endpoint: string, options: RequestInit = {}) {
-  // 3. Get the current session token
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
 
-  // Note: On the Server (SSR), 'session' might be null here because 
-  // 'supabase' relies on browser localStorage. 
   if (!token) {
-    // Optional: Handle missing token gracefully depending on your needs
     console.warn("No active session found during authFetch");
     throw new Error("No active session");
   }
 
-  // 4. Merge headers
   const headers = {
     "Content-Type": "application/json",
     "Authorization": `Bearer ${token}`,
     ...(options.headers || {}),
   };
 
-  // 5. Perform request using the dynamic API_URL
-  const res = await fetch(`${API_URL}${endpoint}`, {
+  const res = await fetch(`${getApiUrl()}${endpoint}`, {
     ...options,
     headers,
   });

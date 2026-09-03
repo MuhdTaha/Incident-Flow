@@ -33,6 +33,7 @@ class CurrentUserRead(BaseModel):
   role: UserRole
   org_id: UUID
   full_name: str
+  invite_pending: bool = False
 
   class Config:
     from_attributes = True

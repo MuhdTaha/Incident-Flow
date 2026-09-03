@@ -70,8 +70,15 @@ def _send_mailjet(
       }
     ]
   })
-  if result.status_code != 200:
-    raise RuntimeError(f"Mailjet invite email failed ({result.status_code}): {result.json()}")
+  payload = result.json() if callable(getattr(result, "json", None)) else {}
+  messages = payload.get("Messages") if isinstance(payload, dict) else None
+  failed = [
+    message
+    for message in (messages or [])
+    if str(message.get("Status") or "").lower() != "success"
+  ]
+  if result.status_code != 200 or failed or not messages:
+    raise RuntimeError(f"Mailjet invite email failed ({result.status_code}): {payload}")
 
 
 def _send_smtp(

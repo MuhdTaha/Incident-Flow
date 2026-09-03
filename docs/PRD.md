@@ -55,7 +55,7 @@ IncidentFlow is a **multi-tenant SaaS incident management tool** for small-to-mi
 
 1. User signs up via Supabase (email/password)
 2. User names their organization → backend creates org + admin user
-3. Dashboard opens an invite dialog (`/?invite=1`); admin can skip or send emails
+3. Dashboard opens an invite dialog; admin can skip or send emails
 4. Admin can invite again later from the Admin console
 5. Invitee opens the Supabase email → `/invite` → sets name and password → joins that org
 
@@ -183,7 +183,7 @@ Engineers cannot assign incidents to other users on create.
 | Admin console | `/admin` | Admin |
 | Post-mortem viewer | `/postmortem/[id]` | All roles (org-scoped) |
 
-**Dashboard features:** stat cards, severity/status/assignee filters, incident table, detail panel with history, create/transition modals. After org create, an invite-teammates dialog (`/?invite=1`). Admin console: **Invite teammate**.
+After org create, an invite-teammates dialog. Admin console: **Invite teammate**.
 
 ---
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertCircle, ArrowRight, Loader2 } from "lucide-react";
@@ -10,13 +10,37 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AuthShell } from "@/app/components/auth/AuthShell";
 import { PasswordField } from "@/app/components/auth/PasswordField";
+import { hasWorkspace } from "@/lib/auth-redirect";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function bounceIfSignedIn() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        if (!cancelled) setCheckingSession(false);
+        return;
+      }
+      if (await hasWorkspace(session.access_token)) {
+        router.replace("/");
+        return;
+      }
+      router.replace("/register");
+    }
+
+    void bounceIfSignedIn();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,6 +55,12 @@ export default function LoginPage() {
 
       if (result.error) throw result.error;
 
+      const session = result.data.session;
+      if (session && !(await hasWorkspace(session.access_token))) {
+        router.push("/register");
+        return;
+      }
+
       router.push("/");
     } catch (err: any) {
       setError(err.message);
@@ -38,6 +68,17 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
+  if (checkingSession) {
+    return (
+      <AuthShell variant="login">
+        <div className="flex flex-col items-center justify-center py-16 text-slate-600 dark:text-slate-400">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600 dark:text-cyan-400" />
+          <p className="mt-3 text-sm">Checking your session…</p>
+        </div>
+      </AuthShell>
+    );
+  }
 
   return (
     <AuthShell variant="login">

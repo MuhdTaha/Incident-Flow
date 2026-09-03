@@ -15,6 +15,7 @@ def _current_user_read(user: models.User) -> user_schemas.CurrentUserRead:
     role=user.role,
     org_id=user.organization_id,
     full_name=user.full_name,
+    invite_pending=bool(user.invite_pending),
   )
 
 

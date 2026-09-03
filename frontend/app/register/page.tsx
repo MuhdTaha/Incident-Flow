@@ -16,6 +16,7 @@ import {
   Users,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { getApiUrl } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +24,13 @@ import { AuthShell } from "@/app/components/auth/AuthShell";
 import { OnboardingStepper, type OnboardingStepId } from "@/app/components/auth/OnboardingStepper";
 import { PasswordField } from "@/app/components/auth/PasswordField";
 import { cn } from "@/lib/utils";
+import {
+  hasWorkspace,
+  markOpenInviteDialog,
+  peekAuthCode,
+  peekAuthTokens,
+  stripAuthParamsFromUrl,
+} from "@/lib/auth-redirect";
 
 type ViewState = "loading" | "signup" | "verify_email" | "org" | "success";
 
@@ -94,10 +102,27 @@ export default function RegisterPage() {
 
   useEffect(() => {
     const checkUserStatus = async () => {
+      const tokens = peekAuthTokens();
+      if (tokens) {
+        await supabase.auth.setSession(tokens);
+        stripAuthParamsFromUrl();
+      } else {
+        const code = peekAuthCode();
+        if (code) {
+          await supabase.auth.exchangeCodeForSession(code);
+          stripAuthParamsFromUrl();
+        }
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
 
       if (!session) {
         setViewState("signup");
+        return;
+      }
+
+      if (await hasWorkspace(session.access_token)) {
+        router.replace("/");
         return;
       }
 
@@ -115,7 +140,7 @@ export default function RegisterPage() {
     };
 
     checkUserStatus();
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     if (viewState !== "org") return;
@@ -139,10 +164,10 @@ export default function RegisterPage() {
 
       if (signUpError) throw signUpError;
 
-      if (data.user && !data.session) {
-        setViewState("verify_email");
-      } else if (data.session) {
+      if (data.session?.user.email_confirmed_at) {
         setViewState("org");
+      } else {
+        setViewState("verify_email");
       }
     } catch (err: any) {
       setError(err.message || "Failed to sign up");
@@ -160,7 +185,7 @@ export default function RegisterPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Session expired. Please log in again.");
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/orgs/register`, {
+      const res = await fetch(`${getApiUrl()}/orgs/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -180,7 +205,8 @@ export default function RegisterPage() {
       }
 
       setViewState("success");
-      window.setTimeout(() => router.push("/?invite=1"), 1400);
+      markOpenInviteDialog();
+      window.setTimeout(() => router.push("/"), 1400);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -310,16 +336,9 @@ export default function RegisterPage() {
           <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
             We sent a confirmation link to{" "}
             <span className="font-semibold text-slate-800 dark:text-slate-100">{email || "your email"}</span>.
-            Open it, then come back here to name your workspace.
+            Open that link to continue setting up your workspace — this page won&apos;t move forward until you use it.
           </p>
-          <Button
-            variant="outline"
-            className="mt-6 h-11 w-full bg-white dark:bg-slate-900/70"
-            onClick={() => window.location.reload()}
-          >
-            I&apos;ve confirmed my email
-          </Button>
-          <p className="mt-4 text-xs text-slate-400">
+          <p className="mt-6 text-xs text-slate-400">
             Don&apos;t see it? Check spam, or wait a minute and try again.
           </p>
         </div>

@@ -9,6 +9,7 @@ from app.db import models
 from app.repositories.user_repo import UserRepository
 from app.core.supabase_admin import (
   EmailAlreadyRegistered,
+  auth_confirmation_state,
   delete_auth_user,
   generate_invite_link,
   get_auth_user_id_by_email,
@@ -98,6 +99,21 @@ class OrganizationService:
       detail="This email already belongs to another organization. Each account can only join one workspace.",
     )
 
+  def _existing_invitee_should_resend(self, existing: models.User, org_id: UUID) -> None:
+    """Raise 409 if they already joined; otherwise caller should resend the invite."""
+    if existing.organization_id != org_id:
+      self._raise_if_email_taken(existing, org_id)
+    if existing.invite_pending:
+      return
+    try:
+      state = auth_confirmation_state(str(existing.id))
+    except RuntimeError:
+      self._raise_if_email_taken(existing, org_id)
+      return
+    if state == "unconfirmed":
+      return
+    self._raise_if_email_taken(existing, org_id)
+
   def _http_status_for_supabase_error(self, message: str) -> int:
     lowered = message.lower()
     if any(token in lowered for token in ("required", "publishable", "placeholder", "anon")):
@@ -120,18 +136,13 @@ class OrganizationService:
   ) -> tuple[str, str]:
     """Auth still has this email after a local delete. Remove the leftover login and invite again."""
     existing = self.repo.get_by_email(email)
-    if not (replacing_pending and existing and existing.invite_pending and existing.organization_id == org_id):
+    if not (replacing_pending and existing and existing.organization_id == org_id):
       self._raise_if_email_taken(existing, org_id)
 
     auth_id = get_auth_user_id_by_email(email)
     if auth_id:
       existing_by_id = self.repo.get_by_id_global(UUID(str(auth_id)))
-      if not (
-        replacing_pending
-        and existing_by_id
-        and existing_by_id.invite_pending
-        and existing_by_id.organization_id == org_id
-      ):
+      if not (replacing_pending and existing_by_id and existing_by_id.organization_id == org_id):
         self._raise_if_email_taken(existing_by_id, org_id)
       delete_auth_user(auth_id)
 
@@ -260,8 +271,7 @@ class OrganizationService:
     email = str(email).strip().lower()
     existing = self.repo.get_by_email(email)
     if existing:
-      if existing.organization_id != org_id or not existing.invite_pending:
-        self._raise_if_email_taken(existing, org_id)
+      self._existing_invitee_should_resend(existing, org_id)
       user_id, action_link = self._invite_or_reinvite(
         email, org_id, replacing_pending=True
       )
