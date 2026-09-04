@@ -35,8 +35,9 @@ The API resolves the user from Postgres and enforces `organization_id` on every 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | GET | `/orgs/org_profile` | Yes | Current org profile |
-| POST | `/orgs/register` | JWT only* | Create org + admin user after Supabase signup |
+| POST | `/orgs/register` | JWT only* | Create org + admin user after Supabase signup. Also claims a leftover Default Org ENGINEER row (Auth-trigger ghost) into the new workspace. |
 | POST | `/orgs/invite` | Admin | Invite user via Supabase email (`redirect_to` `/invite`) |
+| DELETE | `/orgs/current` | Admin | Delete the current workspace after confirming `{ "name": "<org name>" }`. Demo/Default Org is rejected. Removes org rows, teammates (including Auth logins), incidents, and stored files. |
 
 \* Uses token claims only — user row may not exist yet.
 
@@ -69,7 +70,7 @@ Invite body: `{ "email": "alex@company.com", "role": "ENGINEER" }`. `role` is `E
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/users/me` | Yes | Current user `{ id, role, org_id, full_name }` from Postgres (not JWT `app_metadata`) |
+| GET | `/users/me` | Yes | Current user `{ id, role, org_id, full_name, invite_pending, can_create_org }` from Postgres (not JWT `app_metadata`). `can_create_org` is true for unclaimed Default Org ENGINEER signups. |
 | PATCH | `/users/me` | Yes | Update own `full_name` / `phone_number` (role changes are ignored) |
 | GET | `/users` | Yes | List org users |
 | PATCH | `/users/{id}/role` | Admin | Change role |

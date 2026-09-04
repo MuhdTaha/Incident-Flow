@@ -73,19 +73,19 @@ export function consumeOpenInviteFlag(): boolean {
   return true;
 }
 
-export async function hasWorkspace(accessToken: string): Promise<boolean> {
-  const res = await fetch(`${getApiUrl()}/users/me`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  return res.ok;
-}
-
 export async function fetchCurrentProfile(accessToken: string): Promise<{
   invite_pending?: boolean;
+  can_create_org?: boolean;
 } | null> {
   const res = await fetch(`${getApiUrl()}/users/me`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!res.ok) return null;
   return res.json();
+}
+
+export async function hasWorkspace(accessToken: string): Promise<boolean> {
+  const profile = await fetchCurrentProfile(accessToken);
+  if (!profile) return false;
+  return !profile.can_create_org;
 }

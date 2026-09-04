@@ -15,6 +15,9 @@ from app.core.supabase_admin import (
   get_auth_user_id_by_email,
 )
 from app.core.invite_email import send_org_invite_email
+from app.core.constants import DEFAULT_ORG_ID, DEMO_PERSONA_EMAILS
+from app.core.storage import delete_storage_keys
+import re
 
 INVITABLE_ROLES = {
   models.UserRole.ENGINEER,
@@ -26,6 +29,17 @@ INVITABLE_ROLES = {
 def _display_name_from_email(email: str) -> str:
   local = email.split("@")[0].replace(".", " ").replace("_", " ").replace("-", " ").strip()
   return local.title() if local else "New teammate"
+
+
+def is_unclaimed_signup(user: models.User) -> bool:
+  """True when Auth created a Default Org ENGINEER row instead of a real workspace."""
+  if user.invite_pending:
+    return False
+  if user.organization_id != DEFAULT_ORG_ID:
+    return False
+  if user.role != models.UserRole.ENGINEER:
+    return False
+  return (user.email or "").lower() not in DEMO_PERSONA_EMAILS
 
 
 class OrganizationService:
@@ -43,6 +57,23 @@ class OrganizationService:
       raise HTTPException(status_code=404, detail="Organization not found")
     return org
 
+  def _unique_org_slug(self, org_name: str) -> str:
+    base = re.sub(r"[^a-z0-9]+", "-", org_name.lower()).strip("-") or "workspace"
+    slug = base
+    suffix = 2
+    while self.db.query(models.Organization).filter(models.Organization.slug == slug).first():
+      slug = f"{base}-{suffix}"
+      suffix += 1
+    return slug
+
+  def _unique_org_name(self, org_name: str) -> str:
+    name = org_name
+    suffix = 2
+    while self.db.query(models.Organization).filter(models.Organization.name == name).first():
+      name = f"{org_name} ({suffix})"
+      suffix += 1
+    return name
+
   def register_new_org(self, org_name: str, user_id: str, admin_email: str, admin_name: str):
     """
     Creates an Organization and the first Admin User.
@@ -50,26 +81,43 @@ class OrganizationService:
     """
     try:
       existing_user = self.repo.get_by_id_global(UUID(user_id))
-      if existing_user:
+      if existing_user and not is_unclaimed_signup(existing_user):
         raise HTTPException(
           status_code=400,
           detail="Account already exists. Sign in or use your invitation link.",
         )
 
-      slug = org_name.lower().replace(" ", "-")
+      org_name = (org_name or "").strip()
+      if not org_name:
+        raise HTTPException(status_code=400, detail="Organization name is required")
+
+      slug = self._unique_org_slug(org_name)
+      name = self._unique_org_name(org_name)
 
       new_org = models.Organization(
-        name=org_name,
+        name=name,
         slug=slug
       )
       self.db.add(new_org)
       self.db.flush()
 
+      if existing_user:
+        existing_user.email = (admin_email or existing_user.email).lower()
+        existing_user.full_name = admin_name or existing_user.full_name
+        existing_user.role = models.UserRole.ADMIN
+        existing_user.invite_pending = False
+        existing_user.organization_id = new_org.id
+        self.repo.flush()
+        self._commit()
+        self.db.refresh(new_org)
+        self.db.refresh(existing_user)
+        return new_org, existing_user
+
       new_user = models.User(
         id=UUID(user_id),
-        email=admin_email,
+        email=(admin_email or "").lower(),
         full_name=admin_name,
-        role="ADMIN",
+        role=models.UserRole.ADMIN,
         organization_id=new_org.id
       )
       self.repo.add(new_user)
@@ -294,3 +342,53 @@ class OrganizationService:
 
     self._email_invite(email, org_id, user_id, action_link, rollback_auth=True)
     return self._insert_local_invitee(email, role, org_id, user_id)
+
+  def delete_org(self, org_id: UUID, confirmation_name: str) -> None:
+    org = self.get_org(org_id)
+    if org.id == DEFAULT_ORG_ID:
+      raise HTTPException(status_code=403, detail="The demo workspace cannot be deleted.")
+
+    expected = (org.name or "").strip()
+    provided = (confirmation_name or "").strip()
+    if not provided or provided != expected:
+      raise HTTPException(
+        status_code=400,
+        detail="Type the workspace name exactly to confirm deletion.",
+      )
+
+    file_keys = [
+      row.file_key
+      for row in self.db.query(models.IncidentAttachment).filter(
+        models.IncidentAttachment.organization_id == org_id
+      ).all()
+    ]
+    user_ids = [
+      str(row.id)
+      for row in self.db.query(models.User).filter(models.User.organization_id == org_id).all()
+    ]
+
+    try:
+      delete_storage_keys(file_keys, prefixes=[f"orgs/{org_id}/"])
+    except Exception:
+      pass
+
+    self.db.query(models.IncidentAttachment).filter(
+      models.IncidentAttachment.organization_id == org_id
+    ).delete(synchronize_session=False)
+    self.db.query(models.IncidentEvent).filter(
+      models.IncidentEvent.organization_id == org_id
+    ).delete(synchronize_session=False)
+    self.db.query(models.Incident).filter(
+      models.Incident.organization_id == org_id
+    ).delete(synchronize_session=False)
+    self.db.query(models.User).filter(
+      models.User.organization_id == org_id
+    ).delete(synchronize_session=False)
+    self.db.delete(org)
+    self._commit()
+
+    for user_id in user_ids:
+      try:
+        delete_auth_user(user_id)
+      except RuntimeError:
+        pass

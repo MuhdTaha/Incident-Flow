@@ -51,3 +51,13 @@ def invite_user(
     "message": f"Invitation sent to {request.email}",
     "user_id": new_user_id
   }
+
+@router.delete("/current", response_model=org_schemas.OrgDeleteResponse)
+def delete_organization(
+  request: org_schemas.OrgDeleteRequest,
+  service: OrganizationService = Depends(get_org_service),
+  current_org_id: UUID = Depends(get_current_org_id),
+  current_user: models.User = Depends(require_admin),
+):
+  service.delete_org(current_org_id, request.name)
+  return {"message": "Workspace deleted"}

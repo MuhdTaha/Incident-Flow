@@ -87,6 +87,7 @@ def test_get_me_returns_backend_role(client, auth_override, admin_user, test_org
     "org_id": str(test_organization.id),
     "full_name": admin_user.full_name,
     "invite_pending": False,
+    "can_create_org": False,
   }
 
 
@@ -99,6 +100,7 @@ def test_get_me_engineer_role(client, auth_override, engineer_user, test_organiz
   assert data["role"] == "ENGINEER"
   assert data["id"] == str(engineer_user.id)
   assert data["org_id"] == str(test_organization.id)
+  assert data["can_create_org"] is False
 
 
 def test_list_users_scoped(client, db, auth_override, admin_user, test_organization, other_organization):
@@ -224,4 +226,34 @@ def test_patch_me_rejects_blank_name(client, auth_override, engineer_user):
   response = client.patch("/api/v1/users/me", json={"full_name": "   "})
 
   assert response.status_code == 400
+
+
+def test_get_me_can_create_org_for_default_org_engineer(client, db, auth_override, monkeypatch):
+  org_id = uuid.uuid4()
+  monkeypatch.setattr("app.services.org_service.DEFAULT_ORG_ID", org_id)
+  org = Organization(id=org_id, name="Default Org", slug="default-org")
+  db.add(org)
+  user = _create_user(db, org_id, UserRole.ENGINEER, "ghost@example.com")
+  db.commit()
+
+  app.dependency_overrides[get_current_user] = lambda: user
+  response = client.get("/api/v1/users/me")
+
+  assert response.status_code == 200
+  assert response.json()["can_create_org"] is True
+
+
+def test_get_me_hides_create_org_for_demo_persona(client, db, auth_override, monkeypatch):
+  org_id = uuid.uuid4()
+  monkeypatch.setattr("app.services.org_service.DEFAULT_ORG_ID", org_id)
+  org = Organization(id=org_id, name="Default Org", slug="default-org")
+  db.add(org)
+  user = _create_user(db, org_id, UserRole.ENGINEER, "jordan.dev@company.com")
+  db.commit()
+
+  app.dependency_overrides[get_current_user] = lambda: user
+  response = client.get("/api/v1/users/me")
+
+  assert response.status_code == 200
+  assert response.json()["can_create_org"] is False
 

@@ -73,6 +73,11 @@ export default function IncidentDashboard() {
   }, [user, router]);
 
   useEffect(() => {
+    if (profileLoading || !currentUser?.can_create_org) return;
+    router.replace("/register");
+  }, [profileLoading, currentUser, router]);
+
+  useEffect(() => {
     if (profileLoading || !currentUser) return;
     if (!consumeOpenInviteFlag()) return;
     if (isAdmin) setInviteOpen(true);

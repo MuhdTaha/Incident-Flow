@@ -68,3 +68,28 @@ def create_presigned_post(object_name: str, expiration: int = 3600):
     print(f"Error generating presigned URL: {e}")
     return None
   return response
+
+
+def delete_storage_keys(keys: list[str], prefixes: list[str] | None = None) -> None:
+  """Best-effort MinIO/S3 cleanup. Failures must not block DB deletion."""
+  try:
+    client = get_s3_client()
+  except Exception:
+    return
+
+  to_delete = [key for key in keys if key]
+  for prefix in prefixes or []:
+    try:
+      response = client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=prefix)
+      for obj in response.get("Contents") or []:
+        key = obj.get("Key")
+        if key:
+          to_delete.append(key)
+    except Exception:
+      pass
+
+  for key in to_delete:
+    try:
+      client.delete_object(Bucket=BUCKET_NAME, Key=key)
+    except Exception:
+      pass

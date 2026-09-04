@@ -15,7 +15,7 @@ Dedicated demo org. Same password for both roles.
 | Manager | `sarah.ops@company.com` | `IncidentFlow-Demo-2026` |
 | Admin | `alex.admin@company.com` | `IncidentFlow-Demo-2026` |
 
-Please don’t change these users’ roles or delete catalog incidents.
+Please don’t change these users’ roles or delete catalog incidents. The Default Org workspace cannot be deleted from Admin Console.
 
 ## Elevator pitch (30 seconds)
 

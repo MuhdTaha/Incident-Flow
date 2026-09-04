@@ -360,8 +360,7 @@ class DemoSeedService:
       "email_confirm": True,
       "user_metadata": {"full_name": spec["full_name"]},
     }
-    # Reuse the seeded Postgres id so the on_auth_user_created trigger
-    # hits ON CONFLICT (id) instead of failing on users_email_key.
+    # Reuse the seeded Postgres id so Auth and public.users stay aligned.
     local = self.db.query(models.User).filter(models.User.email == email).first()
     if local:
       payload["id"] = str(local.id)

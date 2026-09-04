@@ -17,11 +17,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Users, Activity, AlertTriangle, Settings, UserPlus } from "lucide-react";
+import { Users, Activity, AlertTriangle, Settings, UserPlus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import EditUserModal from "../components/EditUserModal";
 import InviteUsersDialog from "../components/InviteUsersDialog";
+import DeleteOrgDialog from "../components/DeleteOrgDialog";
 import UserStatsModal from "../components/UserStatsModal"; 
 import MetricsDashboard from "../components/MetricsDashboard";
 import AppHeader from "../components/AppHeader";
@@ -41,7 +42,12 @@ export type DetailedUserStat = {
   invite_pending?: boolean;
 };
 
-type DashboardStats = {
+type OrgProfile = {
+  id: string;
+  name: string;
+};
+
+const DEMO_ORG_ID = "00000000-0000-0000-0000-000000000111";
   total_users: number;
   total_incidents: number;
   active_incidents: number;
@@ -50,9 +56,10 @@ type DashboardStats = {
 };
 
 export default function AdminDashboard() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, signOut } = useAuth();
   const { currentUser, loading: profileLoading, isAdmin } = useCurrentUser();
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [org, setOrg] = useState<OrgProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
@@ -60,6 +67,7 @@ export default function AdminDashboard() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [isDeleteOrgOpen, setIsDeleteOrgOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<DetailedUserStat | null>(null);
 
   useEffect(() => {
@@ -69,7 +77,7 @@ export default function AdminDashboard() {
       router.push("/login");
       return;
     }
-    if (!currentUser) {
+    if (!currentUser || currentUser.can_create_org) {
       router.push("/register");
       return;
     }
@@ -83,10 +91,15 @@ export default function AdminDashboard() {
 
   const fetchStats = async () => {
     try {
-      const res = await authFetch("/admin/stats"); // Assuming this is your endpoint
-      if (res.ok) {
-        const data = await res.json();
-        setStats(data);
+      const [statsRes, orgRes] = await Promise.all([
+        authFetch("/admin/stats"),
+        authFetch("/orgs/org_profile"),
+      ]);
+      if (statsRes.ok) {
+        setStats(await statsRes.json());
+      }
+      if (orgRes.ok) {
+        setOrg(await orgRes.json());
       }
     } catch (e) {
       console.error(e);
@@ -274,6 +287,40 @@ export default function AdminDashboard() {
         onClose={() => setIsInviteOpen(false)}
         onInvited={fetchStats}
       />
+
+      {org && org.id !== DEMO_ORG_ID && (
+        <>
+          <Card className="gap-0 py-0 overflow-hidden border-red-200/80 dark:border-red-500/20">
+            <CardHeader className="border-b border-red-100 dark:border-red-500/20 bg-red-50/50 dark:bg-red-500/5 pt-4 pb-3">
+              <CardTitle className="text-base font-semibold text-red-800 dark:text-red-200">
+                Danger zone
+              </CardTitle>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Permanently delete {org.name} and all of its incidents, teammates, and files.
+              </p>
+            </CardHeader>
+            <CardContent className="py-4">
+              <Button variant="destructive" onClick={() => setIsDeleteOrgOpen(true)}>
+                <Trash2 className="h-4 w-4" />
+                Delete workspace
+              </Button>
+            </CardContent>
+          </Card>
+
+          <DeleteOrgDialog
+            isOpen={isDeleteOrgOpen}
+            onClose={() => setIsDeleteOrgOpen(false)}
+            orgName={org.name}
+            onDeleted={async () => {
+              try {
+                await signOut();
+              } catch {
+                router.push("/login");
+              }
+            }}
+          />
+        </>
+      )}
 
     </AppShell>
   );

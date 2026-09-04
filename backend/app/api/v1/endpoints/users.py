@@ -6,6 +6,7 @@ from app.db import models
 from app.schemas import user as user_schemas
 from app.api.deps import get_current_user, get_current_org_id, get_user_service, require_admin
 from app.services.user_service import UserService
+from app.services.org_service import is_unclaimed_signup
 
 router = APIRouter()
 
@@ -16,6 +17,7 @@ def _current_user_read(user: models.User) -> user_schemas.CurrentUserRead:
     org_id=user.organization_id,
     full_name=user.full_name,
     invite_pending=bool(user.invite_pending),
+    can_create_org=is_unclaimed_signup(user),
   )
 
 

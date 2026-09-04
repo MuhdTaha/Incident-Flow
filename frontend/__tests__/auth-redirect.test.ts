@@ -1,6 +1,7 @@
 import {
   consumeOpenInviteFlag,
   decodeJwtEmail,
+  hasWorkspace,
   markOpenInviteDialog,
   OPEN_INVITE_FLAG,
   peekAuthCode,
@@ -59,5 +60,26 @@ describe("auth-redirect", () => {
     window.history.replaceState({}, "", "/?invite=1")
     expect(consumeOpenInviteFlag()).toBe(true)
     expect(sessionStorage.getItem(OPEN_INVITE_FLAG)).toBeNull()
+  })
+
+  it("treats a Default Org ghost membership as no workspace", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ can_create_org: true }),
+    })
+    await expect(hasWorkspace("tok")).resolves.toBe(false)
+  })
+
+  it("treats a real org membership as a workspace", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ can_create_org: false }),
+    })
+    await expect(hasWorkspace("tok")).resolves.toBe(true)
+  })
+
+  it("treats a missing profile as no workspace", async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: false })
+    await expect(hasWorkspace("tok")).resolves.toBe(false)
   })
 })

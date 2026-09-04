@@ -34,6 +34,7 @@ class CurrentUserRead(BaseModel):
   org_id: UUID
   full_name: str
   invite_pending: bool = False
+  can_create_org: bool = False
 
   class Config:
     from_attributes = True

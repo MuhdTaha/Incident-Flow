@@ -87,6 +87,7 @@ Invited users never create a second organization (`AUTH-4`).
 | AUTH-2 | New users register an organization on first login | P0 |
 | AUTH-3 | Admins invite users by email into their org (post-create dialog + Admin console) | P1 |
 | AUTH-4 | Users cannot register a second org if already provisioned | P0 |
+| AUTH-5 | Admins can delete their workspace (not Default Org) after typing the org name | P1 |
 
 ### 7.2 Incidents
 
@@ -111,6 +112,7 @@ Invited users never create a second organization (`AUTH-4`).
 | Reassign / change severity | — | ✓ | ✓ |
 | Delete incidents | — | ✓ | ✓ |
 | Manage users & roles | — | — | ✓ |
+| Delete workspace | — | — | ✓ |
 | Admin analytics | — | — | ✓ |
 
 Engineers cannot assign incidents to other users on create.

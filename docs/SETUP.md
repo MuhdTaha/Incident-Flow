@@ -62,7 +62,7 @@ make seed        # populate demo incidents + audit timelines
 1. Open http://localhost:3000/register
 2. Sign up via Supabase (email/password)
 3. Open the confirmation link in the email to continue (the app will not proceed from the “check your inbox” screen until you do)
-4. Enter an organization name — backend creates org + admin user
+4. Enter an organization name — the API creates the org and your admin membership (Auth signup does **not** put you in Default Org)
 5. After a short success screen, the dashboard opens an **invite teammates** dialog
 6. Invite by email (or skip); teammates can also be invited later from **Admin Console**
 7. Invitees open the link in their email, then set a name and password on `/invite`
@@ -75,7 +75,7 @@ In the Supabase dashboard, add these **Redirect URLs** (Authentication → URL C
 - `http://localhost:3000/register`
 - Your production origin + `/invite` (and `/register`) when deployed
 
-**Portfolio demo tip:** Seed data lands in the **Default Org**. Either register into that org (or set `DEMO_ORG_ID` to your org’s UUID) so the dashboard shows the catalog after login.
+**Portfolio demo tip:** Seed data lands in the **Default Org**. Either register into that org (or set `DEMO_ORG_ID` to your org’s UUID) so the dashboard shows the catalog after login. Admins can delete their own workspace from Admin Console; **Default Org cannot be deleted**.
 
 ## 4. Demo data
 
@@ -189,5 +189,6 @@ make clean           # stop + remove volumes (wipes DB)
 | Invite returns 501 / “Supabase credentials not configured” | Set `SUPABASE_URL` and the **secret / service_role** `SUPABASE_KEY` on the **Render API** service (not the anon/`sb_publishable_` key). Redeploy after saving. |
 | Invite returns 501 mentioning publishable/anon | You pasted the frontend anon key. Use **secret** (`sb_secret_…` or legacy `service_role` JWT) |
 | Invite email link lands on the wrong page | Add `https://<vercel-app>/invite` and `http://localhost:3000/invite` to Supabase Auth **Redirect URLs**; set `FRONTEND_URL` on the API to the Vercel origin (e.g. `https://incident-flow-nine.vercel.app`) |
+| New signup lands in Default Org instead of naming a workspace | Old `on_auth_user_created` trigger. Redeploy the API so Alembic `b7c8d9e0f1a2` runs (`DROP TRIGGER`). If the migration cannot touch `auth.users`, run `DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users; DROP FUNCTION IF EXISTS public.handle_new_user();` in the Supabase SQL editor. Existing ghost members can still name a workspace on `/register`. |
 | Invite email never arrives | Production needs `MAILJET_*` on the API. Locally, open Mailhog at http://localhost:8025 — invites are sent over SMTP, not through Supabase’s mailer. |
 | E2E sign-in failed: Invalid login credentials | The Auth user is missing, unconfirmed, or invite-only. Use a confirmed user (not a pending invite). In CI add `SUPABASE_KEY` so `ensure-e2e-user.mjs` can reset the password. |

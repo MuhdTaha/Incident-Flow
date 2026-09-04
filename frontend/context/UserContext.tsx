@@ -13,6 +13,7 @@ export type CurrentUser = {
   org_id: string;
   full_name: string;
   invite_pending?: boolean;
+  can_create_org?: boolean;
 };
 
 type DirectoryUser = {

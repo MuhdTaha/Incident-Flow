@@ -22,6 +22,12 @@ class InviteResponse(BaseModel):
   message: str
   user_id: UUID
 
+class OrgDeleteRequest(BaseModel):
+  name: str
+
+class OrgDeleteResponse(BaseModel):
+  message: str
+
 class OrgRead(BaseModel):
   id: UUID
   name: str
