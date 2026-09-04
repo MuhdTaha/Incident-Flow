@@ -45,11 +45,12 @@ def invite_user(
   current_org_id: UUID = Depends(get_current_org_id),
   current_user: models.User = Depends(require_admin)
 ):
-  new_user_id = service.invite_user(request.email, request.role, current_org_id)
+  new_user_id, invite_url = service.invite_user(request.email, request.role, current_org_id)
 
   return {
     "message": f"Invitation sent to {request.email}",
-    "user_id": new_user_id
+    "user_id": new_user_id,
+    "invite_url": invite_url,
   }
 
 @router.delete("/current", response_model=org_schemas.OrgDeleteResponse)

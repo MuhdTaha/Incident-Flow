@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AlertCircle, CheckCircle2, Loader2, UserPlus } from "lucide-react";
+import { AlertCircle, CheckCircle2, Copy, Loader2, UserPlus } from "lucide-react";
 import { authFetch } from "@/lib/api";
 
 type InviteRole = "ENGINEER" | "MANAGER" | "ADMIN";
@@ -46,6 +46,8 @@ export default function InviteUsersDialog({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastInvited, setLastInvited] = useState<string | null>(null);
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const [localDev, setLocalDev] = useState(false);
   const inFlight = useRef(false);
 
@@ -61,6 +63,8 @@ export default function InviteUsersDialog({
     setRole("ENGINEER");
     setError(null);
     setLastInvited(null);
+    setInviteUrl(null);
+    setCopied(false);
     setLoading(false);
   }, [isOpen]);
 
@@ -82,7 +86,10 @@ export default function InviteUsersDialog({
         throw new Error(errorMessage(data.detail, "Failed to send invite"));
       }
 
+      const data = await res.json().catch(() => ({}));
       setLastInvited(email.trim());
+      setInviteUrl(typeof data.invite_url === "string" ? data.invite_url : null);
+      setCopied(false);
       setEmail("");
       setRole("ENGINEER");
       onInvited?.();
@@ -91,6 +98,16 @@ export default function InviteUsersDialog({
     } finally {
       inFlight.current = false;
       setLoading(false);
+    }
+  };
+
+  const copyInviteLink = async () => {
+    if (!inviteUrl) return;
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      setCopied(true);
+    } catch {
+      setCopied(false);
     }
   };
 
@@ -109,12 +126,26 @@ export default function InviteUsersDialog({
 
         <form onSubmit={handleInvite} className="grid gap-4">
           {lastInvited && (
-            <div className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
-              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>
-                Invite sent to {lastInvited}. They stay pending until they join from the email.
-                {localDev ? " Locally the message lands in Mailhog at http://localhost:8025, not Gmail." : ""}
-              </span>
+            <div className="space-y-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>
+                  Invite sent to {lastInvited}. They stay pending until they join from the email.
+                  {localDev ? " Locally the message lands in Mailhog at http://localhost:8025, not Gmail." : " If it is not in their inbox, check spam or share the invite link."}
+                </span>
+              </div>
+              {inviteUrl && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="ml-6"
+                  onClick={copyInviteLink}
+                >
+                  <Copy className="h-4 w-4" />
+                  {copied ? "Link copied" : "Copy invite link"}
+                </Button>
+              )}
             </div>
           )}
 

@@ -324,7 +324,7 @@ class OrganizationService:
         email, org_id, replacing_pending=True
       )
       self._email_invite(email, org_id, user_id, action_link, rollback_auth=False)
-      return self._upsert_local_invitee(existing, email, role, org_id, user_id)
+      return self._upsert_local_invitee(existing, email, role, org_id, user_id), action_link
 
     user_id, action_link = self._invite_or_reinvite(email, org_id)
     existing_by_id = self.repo.get_by_id_global(UUID(str(user_id)))
@@ -338,10 +338,10 @@ class OrganizationService:
       elif not existing_by_id.invite_pending:
         self._raise_if_email_taken(existing_by_id, org_id)
       self._email_invite(email, org_id, user_id, action_link, rollback_auth=False)
-      return self._upsert_local_invitee(existing_by_id, email, role, org_id, user_id)
+      return self._upsert_local_invitee(existing_by_id, email, role, org_id, user_id), action_link
 
     self._email_invite(email, org_id, user_id, action_link, rollback_auth=True)
-    return self._insert_local_invitee(email, role, org_id, user_id)
+    return self._insert_local_invitee(email, role, org_id, user_id), action_link
 
   def delete_org(self, org_id: UUID, confirmation_name: str) -> None:
     org = self.get_org(org_id)

@@ -122,6 +122,7 @@ def test_invite_success_creates_local_user(client, db, monkeypatch):
   assert response.status_code == 200
   data = response.json()
   assert data["user_id"] == str(invited_id)
+  assert data["invite_url"].endswith("type=invite")
   assert "jordan.lee@company.com" in data["message"].lower()
   assert captured["redirect_to"] == "http://localhost:3000/invite"
   assert captured["user_metadata"]["org_id"] == str(org.id)

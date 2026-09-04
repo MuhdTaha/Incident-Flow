@@ -55,7 +55,11 @@ describe('InviteUsersDialog', () => {
   it('submits an invite and shows a success state so another email can be added', async () => {
     mockAuthFetch.mockResolvedValue({
       ok: true,
-      json: async () => ({ message: 'Invitation sent to alex@company.com', user_id: 'user-2' }),
+      json: async () => ({
+        message: 'Invitation sent to alex@company.com',
+        user_id: 'user-2',
+        invite_url: 'https://example.supabase.co/auth/v1/verify?token=abc&type=invite',
+      }),
     })
     const onInvited = jest.fn()
     const onClose = jest.fn()
@@ -72,10 +76,10 @@ describe('InviteUsersDialog', () => {
         method: 'POST',
         body: JSON.stringify({ email: 'alex@company.com', role: 'ENGINEER' }),
       })
+      expect(onInvited).toHaveBeenCalled()
+      expect(screen.getByText(/Invite sent to alex@company.com/)).toBeInTheDocument()
     })
-
-    expect(onInvited).toHaveBeenCalled()
-    expect(screen.getByText(/Invite sent to alex@company.com/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Copy invite link' })).toBeInTheDocument()
     expect(screen.getByLabelText('Work email')).toHaveValue('')
     expect(onClose).not.toHaveBeenCalled()
   })

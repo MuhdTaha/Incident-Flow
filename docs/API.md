@@ -41,7 +41,7 @@ The API resolves the user from Postgres and enforces `organization_id` on every 
 
 \* Uses token claims only — user row may not exist yet.
 
-Invite body: `{ "email": "alex@company.com", "role": "ENGINEER" }`. `role` is `ENGINEER` (default), `MANAGER`, or `ADMIN`. A second invite to the same email **resends** while they are still pending; an active teammate returns **409**. The API generates a Supabase invite link and emails it via **Mailjet** (production) or **SMTP/Mailhog** (local). The local user is created as `invite_pending` until they set a password on `/invite`. Missing secret-key credentials return **501**. Email send failure returns **502** and rolls back the Auth user.
+Invite body: `{ "email": "alex@company.com", "role": "ENGINEER" }`. `role` is `ENGINEER` (default), `MANAGER`, or `ADMIN`. A second invite to the same email **resends** while they are still pending; an active teammate returns **409**. The API generates a Supabase invite link and emails it via **Mailjet** (production) or **SMTP/Mailhog** (local). The response includes `invite_url` so an admin can share the link if mail is delayed. The local user is created as `invite_pending` until they set a password on `/invite`. Missing secret-key credentials return **501**. Email send failure returns **502** and rolls back the Auth user.
 
 ### Incidents — `/incidents`
 

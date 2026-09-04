@@ -21,6 +21,7 @@ class InviteRequest(BaseModel):
 class InviteResponse(BaseModel):
   message: str
   user_id: UUID
+  invite_url: str
 
 class OrgDeleteRequest(BaseModel):
   name: str
