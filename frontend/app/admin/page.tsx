@@ -48,11 +48,13 @@ type OrgProfile = {
 };
 
 const DEMO_ORG_ID = "00000000-0000-0000-0000-000000000111";
+
+type DashboardStats = {
   total_users: number;
   total_incidents: number;
   active_incidents: number;
   incidents_by_severity: Record<string, number>;
-  user_performance: DetailedUserStat[]; // Updated field name
+  user_performance: DetailedUserStat[];
 };
 
 export default function AdminDashboard() {
