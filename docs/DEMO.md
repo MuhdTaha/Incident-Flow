@@ -23,13 +23,15 @@ IncidentFlow is a multi-tenant incident manager. Teams declare production issues
 
 ## Screenshots
 
-Capture these three after the live app is up (dashboard, admin analytics, post-mortem) and drop them in `docs/screenshots/`:
+Landing page is checked in. Capture the other three after the live app is up and drop them in `docs/screenshots/`:
 
-1. **Dashboard** — queue + filters + **Last updated** (not a live badge)
-2. **Admin console** — charts + team table + **Invite teammate** (Admin link only when role is `ADMIN`)
-3. **Post-mortem** — generated markdown for a resolved incident
+1. **Landing** — marketing page at `/` (checked in)
+2. **Dashboard** — queue + filters + **Last updated** (not a live badge)
+3. **Admin console** — charts + team table + **Invite teammate** (Admin link only when role is `ADMIN`)
+4. **Post-mortem** — generated markdown for a resolved incident
 
 ```
+docs/screenshots/landing.png
 docs/screenshots/dashboard.png
 docs/screenshots/admin.png
 docs/screenshots/postmortem.png
@@ -39,7 +41,7 @@ docs/screenshots/postmortem.png
 
 ### 1. Engineer — create (≈1 min)
 
-1. Open [the live app](https://incident-flow-nine.vercel.app) (or http://localhost:3000) → sign in as **Jordan**.
+1. Open [the live app](https://incident-flow-nine.vercel.app) (or http://localhost:3000). `/` is the landing page; sign in as **Jordan** to reach `/dashboard`.
 2. Confirm the nav shows **ENGINEER** and there is **no** Admin Console link.
 3. Point at seeded catalog incidents (gateway timeout, DB pool, etc.).
 4. **Declare incident**: title `Demo: checkout latency`, severity **SEV2**, description one sentence, assign to yourself.

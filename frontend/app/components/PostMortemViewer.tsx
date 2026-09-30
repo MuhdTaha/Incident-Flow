@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { authFetch } from "@/lib/api";
+import { messageFromResponse, toastNetworkError } from "@/lib/api-error";
+import { toast } from "@/lib/toast";
 import { Eye, FileText, Printer, Loader2, Sparkles } from "lucide-react";
 
 interface PostMortemViewerProps {
@@ -31,9 +33,15 @@ export default function PostMortemViewer({ incidentId, status }: PostMortemViewe
           method: "GET",
         });
         if (!mounted) return;
-        setHasReport(res.ok);
+        if (res.ok || res.status === 404) {
+          setHasReport(res.ok);
+          return;
+        }
+        toast.error(await messageFromResponse(res, "Couldn't check for an existing post-mortem."));
+        setHasReport(false);
       } catch {
         if (!mounted) return;
+        toastNetworkError();
         setHasReport(false);
       } finally {
         if (mounted) setChecking(false);
@@ -56,14 +64,12 @@ export default function PostMortemViewer({ incidentId, status }: PostMortemViewe
         method: "POST"
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || "Failed to generate report");
+        throw new Error(await messageFromResponse(res, "Couldn't generate the post-mortem. Try again."));
       }
       setHasReport(true);
       window.open(`/postmortem/${incidentId}`, "_blank", "noopener,noreferrer");
     } catch (error) {
-      console.error("Failed to generate report", error);
-      alert("Failed to generate report. Please try again.");
+      toast.error(error instanceof Error ? error.message : "Couldn't generate the post-mortem. Try again.");
     } finally {
       setLoading(false);
     }

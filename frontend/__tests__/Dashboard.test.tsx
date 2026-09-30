@@ -121,6 +121,18 @@ describe('IncidentDashboard', () => {
     expect(authFetch).toHaveBeenCalledWith('/incidents')
   })
 
+  it('prompts to declare the first incident when the queue is empty', async () => {
+    (authFetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => [],
+    })
+
+    render(<IncidentDashboard />)
+
+    expect(await screen.findByRole('heading', { name: 'Declare your first incident' })).toBeInTheDocument()
+    expect(screen.queryByText('Incident Queue')).toBeInTheDocument()
+  })
+
   it('filters incidents when searching', async () => {
     (authFetch as jest.Mock).mockResolvedValue({
       ok: true,

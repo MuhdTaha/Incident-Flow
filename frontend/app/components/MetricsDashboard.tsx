@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { authFetch } from "@/lib/api";
+import { toastIfFailed, toastNetworkError } from "@/lib/api-error";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   LineChart, 
@@ -47,12 +48,10 @@ export default function MetricsDashboard() {
     try {
       // Pass the 'days' query parameter to the backend
       const res = await authFetch(`/admin/charts?days=${timeWindow}`);
-      if (res.ok) {
-        const json = await res.json();
-        setData(json);
-      }
-    } catch (error) {
-      console.error("Failed to fetch analytics", error);
+      if (await toastIfFailed(res, "Couldn't load analytics.")) return;
+      setData(await res.json());
+    } catch {
+      toastNetworkError();
     } finally {
       setLoading(false);
     }

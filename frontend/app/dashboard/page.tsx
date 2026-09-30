@@ -14,6 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { 
+  Plus,
   RefreshCw, 
   Settings2, 
   User,
@@ -29,6 +30,7 @@ import { getSevStyles, getStatusIcon } from "@/lib/incident-utils";
 import { useAuth } from "@/context/AuthContext";
 import { useCurrentUser, useUserDirectory } from "@/context/UserContext";
 import { authFetch } from "@/lib/api";
+import { toastIfFailed, toastNetworkError } from "@/lib/api-error";
 import { useIncidentPoll } from "@/hooks/useIncidentPoll";
 import InviteUsersDialog from "../components/InviteUsersDialog";
 import { consumeOpenInviteFlag } from "@/lib/auth-redirect";
@@ -52,6 +54,8 @@ export default function IncidentDashboard() {
   const { isAdmin, loading: profileLoading, currentUser } = useCurrentUser();
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const [fetchFailed, setFetchFailed] = useState(false);
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
 
   const [actionIncident, setActionIncident] = useState<Incident | null>(null);
@@ -88,22 +92,27 @@ export default function IncidentDashboard() {
 
   const fetchIncidents = useCallback(async () => {
     setLoading(true);
+    let redirecting = false;
     try {
       const res = await authFetch("/incidents");
 
       if (res.status === 401) {
-        console.warn("User not registered in backend. Redirecting to registration page.");
+        redirecting = true;
         router.push("/register");
         return;
       }
 
-      if (res.ok) {
-        const data = await res.json();
-        setIncidents(data);
+      if (await toastIfFailed(res, "Couldn't load incidents.")) {
+        setFetchFailed(true);
+        return;
       }
-    } catch (e) {
-      console.error("Failed to fetch incidents");
+      setFetchFailed(false);
+      setIncidents(await res.json());
+    } catch {
+      setFetchFailed(true);
+      toastNetworkError();
     } finally {
+      if (!redirecting) setHasLoaded(true);
       setLoading(false);
     }
   }, [router]);
@@ -183,6 +192,40 @@ export default function IncidentDashboard() {
           <CardTitle className="text-base font-semibold text-slate-800 dark:text-slate-100">Incident Queue</CardTitle>
         </CardHeader>
         <CardContent className="p-0 bg-white/40 dark:bg-transparent">
+          {!hasLoaded ? (
+            <p className="px-6 py-16 text-center text-sm text-slate-500 dark:text-slate-400">Loading incidents…</p>
+          ) : fetchFailed && incidents.length === 0 ? (
+            <div className="flex flex-col items-center px-6 py-16 text-center">
+              <h3 className="text-base font-semibold text-slate-900 dark:text-slate-50">Couldn&apos;t load the queue</h3>
+              <p className="mt-2 max-w-md text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                Check your connection, then try again.
+              </p>
+              <Button onClick={refresh} variant="outline" className="mt-5">
+                <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                Try again
+              </Button>
+            </div>
+          ) : incidents.length === 0 ? (
+            <div className="flex flex-col items-center px-6 py-16 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-400 text-white shadow-md shadow-blue-500/30">
+                <Plus className="h-5 w-5" />
+              </div>
+              <h3 className="mt-4 text-base font-semibold text-slate-900 dark:text-slate-50">
+                Declare your first incident
+              </h3>
+              <p className="mt-2 max-w-md text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                Capture what broke, then move it through the lifecycle. Comments, status changes, and files stay on the audit trail.
+              </p>
+              <div className="mt-5">
+                <CreateIncidentModal onIncidentCreated={refresh} />
+              </div>
+            </div>
+          ) : filteredIncidents.length === 0 ? (
+            <div className="px-6 py-16 text-center">
+              <h3 className="text-base font-semibold text-slate-900 dark:text-slate-50">No incidents match these filters</h3>
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Clear a filter, or declare a new incident.</p>
+            </div>
+          ) : (
           <Table>
             <TableHeader className="bg-blue-50/50 dark:bg-blue-500/10">
               <TableRow>
@@ -247,6 +290,7 @@ export default function IncidentDashboard() {
               ))}
             </TableBody>
           </Table>
+          )}
         </CardContent>
       </Card>
 

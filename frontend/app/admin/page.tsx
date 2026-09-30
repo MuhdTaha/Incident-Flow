@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useCurrentUser } from "@/context/UserContext";
 import { authFetch } from "@/lib/api";
+import { toastIfFailed, toastNetworkError } from "@/lib/api-error";
 import { 
   Card, 
   CardContent, 
@@ -97,14 +98,14 @@ export default function AdminDashboard() {
         authFetch("/admin/stats"),
         authFetch("/orgs/org_profile"),
       ]);
-      if (statsRes.ok) {
+      if (!(await toastIfFailed(statsRes, "Couldn't load admin stats."))) {
         setStats(await statsRes.json());
       }
-      if (orgRes.ok) {
+      if (!(await toastIfFailed(orgRes, "Couldn't load the workspace."))) {
         setOrg(await orgRes.json());
       }
-    } catch (e) {
-      console.error(e);
+    } catch {
+      toastNetworkError();
     } finally {
       setLoading(false);
     }

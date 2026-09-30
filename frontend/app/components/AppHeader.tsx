@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Building2 } from "lucide-react";
 import UserNav from "./UserNav";
 import { authFetch } from "@/lib/api";
+import { toastIfFailed, toastNetworkError } from "@/lib/api-error";
 import Link from "next/link";
 import { BrandMark } from "./BrandMark";
 import { ThemeToggle } from "./ThemeToggle";
@@ -16,13 +17,15 @@ export default function AppHeader() {
     const fetchOrgProfile = async () => {
       try {
         const res = await authFetch("/orgs/org_profile");
-        if (res.ok) {
-          const data = await res.json();
-          setOrgName(data.name);
+        if (await toastIfFailed(res, "Couldn't load the workspace.")) {
+          setOrgName("Unavailable");
+          return;
         }
-      } catch (e) {
-        console.error("Failed to fetch org details");
-        setOrgName("N/A");
+        const data = await res.json();
+        setOrgName(data.name);
+      } catch {
+        toastNetworkError();
+        setOrgName("Unavailable");
       } finally {
         setLoading(false);
       }

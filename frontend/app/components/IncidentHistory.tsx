@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 
 import { authFetch } from "@/lib/api";
+import { toastIfFailed, toastNetworkError } from "@/lib/api-error";
 import AttachmentManager from "./AttachmentManager";
 import IncidentCommentThread from "./IncidentCommentThread";
 import { useUserDirectory } from "@/context/UserContext";
@@ -64,10 +65,14 @@ export default function IncidentHistory({ incidentId, incidentTitle, incidentDes
     setLoading(true);
     try {
       const res = await authFetch(`/incidents/${incidentId}/events`);
+      if (await toastIfFailed(res, "Couldn't load the incident timeline.")) {
+        setEvents([]);
+        return;
+      }
       const data = await res.json();
       setEvents(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error(err);
+    } catch {
+      toastNetworkError();
       setEvents([]);
     } finally {
       setLoading(false);

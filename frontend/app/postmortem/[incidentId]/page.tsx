@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import ReactMarkdown, { Components } from "react-markdown";
 import { authFetch } from "@/lib/api";
+import { toast } from "@/lib/toast";
 import { AppShell } from "@/app/components/AppShell";
 
 interface CodeProps {
@@ -136,6 +137,7 @@ export default function PostMortemPage() {
         if (!mounted) return;
         const message = err instanceof Error ? err.message : "Unable to load post-mortem report";
         setError(message);
+        toast.error(message);
       } finally {
         if (mounted) setLoading(false);
       }

@@ -6,6 +6,10 @@ Multi-tenant incident management for engineering teams. Declare a production iss
 
 **5-minute walkthrough:** [docs/DEMO.md](docs/DEMO.md)
 
+`/` is the marketing page. Sign-in, registration, and the demo tour open the workspace at `/dashboard`.
+
+![IncidentFlow landing page](docs/screenshots/landing.png)
+
 ## Live demo
 
 | | |
@@ -65,7 +69,7 @@ make migrate
 make seed          # demo incidents + audit timelines
 ```
 
-Open **http://localhost:3000**. API docs: **http://localhost:8000/docs**.
+Open **http://localhost:3000** for the landing page. After you sign in, the workspace is at **http://localhost:3000/dashboard**. API docs: **http://localhost:8000/docs**.
 
 See [docs/SETUP.md](docs/SETUP.md) for environment variables, demo seeding, and deploy notes.
 

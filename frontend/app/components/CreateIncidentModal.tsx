@@ -13,6 +13,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, AlertTriangle } from "lucide-react";
 import { authFetch } from "@/lib/api";
+import { messageFromResponse, toastNetworkError } from "@/lib/api-error";
+import { toast } from "@/lib/toast";
 import { useAuth } from "@/context/AuthContext";
 import { useUserDirectory } from "@/context/UserContext";
 
@@ -60,23 +62,18 @@ export default function CreateIncidentModal({ onIncidentCreated }: { onIncidentC
       if (res.ok) {
         setOpen(false);
         onIncidentCreated();
-        // Reset Form
         setTitle("");
         setDesc("");
         setSeverity("SEV4");
         setAssigneeId(currentUser?.id || "");
       } else {
-        // check for 403 error
-        if (res.status === 403) {
-          alert("You do not have permission to create an incident assigned to another user.");
-        } else {
-          const errorData = await res.json();
-          alert("Error: " + (errorData.message || "Failed to create incident"));
-        }
+        const fallback = res.status === 403
+          ? "You do not have permission to create an incident assigned to another user."
+          : "Failed to create incident";
+        toast.error(await messageFromResponse(res, fallback));
       }
-    } catch (error) {
-      console.error("Network error:", error);
-      alert("Network error");
+    } catch {
+      toastNetworkError();
     } finally {
       setLoading(false);
     }

@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { authFetch } from '@/lib/api';
+import { toastIfFailed, toastNetworkError } from '@/lib/api-error';
+import { toast } from '@/lib/toast';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { useAuth } from '@/context/AuthContext';
 import { useCurrentUser } from '@/context/UserContext';
@@ -46,11 +48,11 @@ export default function AttachmentManager({ incidentId, onAttachmentChange }: At
   const fetchAttachments = useCallback(async () => {
     try {
       const res = await authFetch(`/incidents/${incidentId}/attachments`);
-      if (!res.ok) throw new Error("Failed to fetch attachments");
+      if (await toastIfFailed(res, "Couldn't load attachments.")) return;
       const data = await res.json();
       setAttachments(data || []);
-    } catch (err) {
-      console.error(err);
+    } catch {
+      toastNetworkError();
     } finally {
       setLoadingList(false);
     }
@@ -59,6 +61,10 @@ export default function AttachmentManager({ incidentId, onAttachmentChange }: At
   useEffect(() => {
     fetchAttachments();
   }, [fetchAttachments]);
+
+  useEffect(() => {
+    if (status === "ERROR" && error) toast.error(error);
+  }, [status, error]);
 
   if (!user) return null;
 
@@ -95,7 +101,7 @@ export default function AttachmentManager({ incidentId, onAttachmentChange }: At
   const handleUpload = async (file: File) => {
     // 10MB Limit Check
     if (file.size > 10 * 1024 * 1024) {
-      alert("File is too large (Max 10MB)");
+      toast.error("File is too large. The limit is 10MB.");
       return;
     }
 
@@ -125,8 +131,8 @@ export default function AttachmentManager({ incidentId, onAttachmentChange }: At
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
-    } catch (e) {
-      console.error("Download failed", e);
+    } catch {
+      toast.error("Couldn't download the file. Opening it in a new tab.");
       window.open(url, "_blank");
     }
   };
@@ -140,14 +146,12 @@ export default function AttachmentManager({ incidentId, onAttachmentChange }: At
         method: "DELETE"
       });
       
-      if (!res.ok) throw new Error("Failed to delete attachment");
+      if (await toastIfFailed(res, "Couldn't delete the attachment.")) return;
       
       setAttachments(prev => prev.filter(a => a.id !== attId));
-      // Refresh audit log to show ATTACHMENT_DELETE event
       if (onAttachmentChange) onAttachmentChange();
-    } catch (e) {
-      console.error(e);
-      alert("Failed to delete attachment");
+    } catch {
+      toastNetworkError();
     } finally {
       setDeletingId(null);
     }

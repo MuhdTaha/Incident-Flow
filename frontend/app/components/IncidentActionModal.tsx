@@ -20,6 +20,8 @@ import { ArrowRightLeft, MessageSquare, Pencil, Trash2, AlertTriangle } from "lu
 import { useAuth } from "@/context/AuthContext";
 import { useCurrentUser } from "@/context/UserContext";
 import { authFetch } from "@/lib/api";
+import { toastIfFailed, toastNetworkError } from "@/lib/api-error";
+import { toast } from "@/lib/toast";
 
 type Incident = {
   id: string;
@@ -61,13 +63,12 @@ export default function IncidentActionModal({ incident, isOpen, onClose, onSucce
     if (isOpen) {
       let isMounted = true;
       authFetch("/users")
-        .then((res) => res.json())
-        .then((data) => {
-          if (isMounted) {
-            setUsers(data);
-          }
+        .then(async (res) => {
+          if (await toastIfFailed(res, "Couldn't load teammates.")) return;
+          const data = await res.json();
+          if (isMounted && Array.isArray(data)) setUsers(data);
         })
-        .catch((err) => console.error("Failed to fetch users", err));
+        .catch(() => toastNetworkError());
       
       return () => {
         isMounted = false;
@@ -107,9 +108,8 @@ export default function IncidentActionModal({ incident, isOpen, onClose, onSucce
           }),
         });
 
-        if (!res.ok) throw new Error("Failed to transition incident");
+        if (await toastIfFailed(res, "Couldn't update the incident status.")) return;
       } else if (actionType === "COMMENT" && comment) {
-        // Handle Comment Addition
         const res = await authFetch(`/incidents/${incident.id}/comment`, {
           method: "POST",
           headers: { "Content-Type": "application/json"},
@@ -118,9 +118,8 @@ export default function IncidentActionModal({ incident, isOpen, onClose, onSucce
             comment: comment,
           }),
         });
-        if (!res.ok) throw new Error("Failed to add comment");
+        if (await toastIfFailed(res, "Couldn't add the comment.")) return;
       } else if (actionType === "EDIT") {
-        // Handle Incident Edit (e.g., Severity or Assignee Change)
         const res = await authFetch(`/incidents/${incident.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json"},
@@ -131,20 +130,13 @@ export default function IncidentActionModal({ incident, isOpen, onClose, onSucce
           }),
         });
 
-        if (res.status === 403) {
-          alert("Permission Denied: You cannot edit this incident.");
-          setLoading(false);
-          return;
-        }
-
-        if (!res.ok) throw new Error("Failed to update incident");
+        if (await toastIfFailed(res, "Couldn't update the incident.")) return;
       }
 
       onSuccess();
       onClose();
-    } catch (e) {
-      console.error(e);
-      alert("An error occurred. Please try again.");
+    } catch {
+      toastNetworkError();
     } finally {
       setLoading(false);
     }
@@ -161,13 +153,13 @@ export default function IncidentActionModal({ incident, isOpen, onClose, onSucce
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ actor_id: user.id }),
       });
-      if (!res.ok) throw new Error("Failed to delete incident");
+      if (await toastIfFailed(res, "Couldn't delete the incident.")) return;
       onSuccess();
       onClose();
-      alert("Incident deleted successfully.");
-    } catch (e) {
-      console.error(e);
-      alert("Failed to delete incident. Please try again.");
+      toast.success("Incident deleted.");
+    } catch {
+      toastNetworkError();
+    } finally {
       setLoading(false);
     }
   }

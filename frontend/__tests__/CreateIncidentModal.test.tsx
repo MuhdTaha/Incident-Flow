@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import CreateIncidentModal from '@/app/components/CreateIncidentModal'
 import { authFetch } from '@/lib/api'
+import { clearToasts, Toaster } from '@/lib/toast'
 
 jest.mock('@/components/ui/dialog', () => ({
   Dialog: ({ children }: { children: ReactNode }) => <div>{children}</div>,
@@ -34,11 +35,7 @@ const mockAuthFetch = authFetch as jest.Mock
 describe('CreateIncidentModal', () => {
   beforeEach(() => {
     mockAuthFetch.mockReset()
-    jest.spyOn(window, 'alert').mockImplementation(() => {})
-  })
-
-  afterEach(() => {
-    ;(window.alert as jest.Mock).mockRestore()
+    clearToasts()
   })
 
   it('submits incident without owner_id when assignee is self', async () => {
@@ -73,7 +70,12 @@ describe('CreateIncidentModal', () => {
   it('shows a permission alert on 403', async () => {
     mockAuthFetch.mockResolvedValue({ ok: false, status: 403, json: async () => ({}) })
 
-    render(<CreateIncidentModal onIncidentCreated={jest.fn()} />)
+    render(
+      <>
+        <Toaster />
+        <CreateIncidentModal onIncidentCreated={jest.fn()} />
+      </>
+    )
 
     fireEvent.change(screen.getByLabelText('Incident Title'), { target: { value: 'DB outage' } })
     fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Primary DB down' } })
@@ -82,10 +84,8 @@ describe('CreateIncidentModal', () => {
     const submitButtons = screen.getAllByRole('button', { name: 'Declare Incident' })
     fireEvent.click(submitButtons[submitButtons.length - 1])
 
-    await waitFor(() => {
-      expect(window.alert).toHaveBeenCalledWith(
-        'You do not have permission to create an incident assigned to another user.'
-      )
-    })
+    expect(await screen.findByText(
+      'You do not have permission to create an incident assigned to another user.'
+    )).toBeInTheDocument()
   })
 })

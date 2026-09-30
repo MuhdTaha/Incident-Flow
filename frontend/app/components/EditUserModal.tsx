@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { AlertTriangle, Trash2, UserCog } from "lucide-react";
 import { authFetch } from "@/lib/api";
+import { toastIfFailed, toastNetworkError } from "@/lib/api-error";
 
 type User = {
   id: string;
@@ -62,12 +63,12 @@ export default function EditUserModal({ user, isOpen, onClose, onSuccess }: Edit
         body: JSON.stringify({ role }),
       });
 
-      if (!res.ok) throw new Error("Failed to update role");
+      if (await toastIfFailed(res, "Couldn't update that role.")) return;
       
       onSuccess();
       onClose();
-    } catch (e) {
-      alert("Failed to update role");
+    } catch {
+      toastNetworkError();
     } finally {
       setLoading(false);
     }
@@ -81,15 +82,12 @@ export default function EditUserModal({ user, isOpen, onClose, onSuccess }: Edit
         method: "DELETE",
       });
 
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || "Failed to delete");
-      }
+      if (await toastIfFailed(res, "Couldn't remove that teammate.")) return;
       
       onSuccess();
       onClose();
-    } catch (e: any) {
-      alert(e.message);
+    } catch {
+      toastNetworkError();
     } finally {
       setLoading(false);
     }

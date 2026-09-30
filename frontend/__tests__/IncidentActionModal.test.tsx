@@ -52,11 +52,6 @@ const incident = {
 describe('IncidentActionModal', () => {
   beforeEach(() => {
     mockAuthFetch.mockReset()
-    jest.spyOn(window, 'alert').mockImplementation(() => {})
-  })
-
-  afterEach(() => {
-    ;(window.alert as jest.Mock).mockRestore()
   })
 
   it('submits a transition action with default next state', async () => {

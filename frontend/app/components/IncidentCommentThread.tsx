@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { authFetch } from "@/lib/api";
+import { toastIfFailed, toastNetworkError } from "@/lib/api-error";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Send } from "lucide-react";
@@ -69,12 +70,11 @@ export default function IncidentCommentThread({ incidentId, onCommentAdded }: In
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ comment }),
       });
-      if (res.ok) {
-        setComment("");
-        onCommentAdded();
-      }
-    } catch (err) {
-      console.error("Failed to post comment", err);
+      if (await toastIfFailed(res, "Couldn't post the comment.")) return;
+      setComment("");
+      onCommentAdded();
+    } catch {
+      toastNetworkError();
     } finally {
       setSubmitting(false);
     }
