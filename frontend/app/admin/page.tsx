@@ -84,7 +84,7 @@ export default function AdminDashboard() {
       return;
     }
     if (!isAdmin) {
-      router.push("/");
+      router.push("/dashboard");
       return;
     }
 

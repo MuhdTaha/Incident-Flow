@@ -33,7 +33,7 @@ export default function AppHeader() {
   return (
     <header className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-blue-100/70 dark:border-white/10">
       <div className="flex items-center gap-4">
-        <Link href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+        <Link href="/dashboard" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
           <BrandMark />
           <h1 className="text-lg font-bold tracking-tight text-slate-900 dark:text-slate-50">
             IncidentFlow

@@ -16,8 +16,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Incident Flow",
-  description: "A modern incident management tool built with Next.js, Supabase, and Tailwind CSS.",
+  title: {
+    default: "IncidentFlow",
+    template: "%s · IncidentFlow",
+  },
+  description:
+    "IncidentFlow helps engineering teams declare production incidents, move them through an enforced lifecycle, and keep an audit trail for post-mortems.",
 };
 
 const themeInitScript = `(function(){try{var t=localStorage.getItem("incidentflow-theme");var d=t==="dark"||(t!=="light"&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(d)document.documentElement.classList.add("dark");}catch(e){}})();`;

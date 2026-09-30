@@ -122,7 +122,7 @@ export default function RegisterPage() {
       }
 
       if (await hasWorkspace(session.access_token)) {
-        router.replace("/");
+        router.replace("/dashboard");
         return;
       }
 
@@ -195,7 +195,7 @@ export default function RegisterPage() {
       });
 
       if (res.status === 409) {
-        router.push("/");
+        router.push("/dashboard");
         return;
       }
 
@@ -206,7 +206,7 @@ export default function RegisterPage() {
 
       setViewState("success");
       markOpenInviteDialog();
-      window.setTimeout(() => router.push("/"), 1400);
+      window.setTimeout(() => router.push("/dashboard"), 1400);
     } catch (err: any) {
       setError(err.message);
     } finally {

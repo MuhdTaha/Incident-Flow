@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import IncidentDashboard from '@/app/page'
+import IncidentDashboard from '@/app/dashboard/page'
 import { authFetch } from '@/lib/api'
 import '@testing-library/jest-dom'
 

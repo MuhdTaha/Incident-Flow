@@ -36,7 +36,12 @@ interface UserContextType {
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 function isAuthPath(pathname: string) {
-  return pathname.startsWith("/login") || pathname.startsWith("/register") || pathname.startsWith("/invite");
+  return (
+    pathname === "/" ||
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/register") ||
+    pathname.startsWith("/invite")
+  );
 }
 
 export function UserProvider({ children }: { children: React.ReactNode }) {

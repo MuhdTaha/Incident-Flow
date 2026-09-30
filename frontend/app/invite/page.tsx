@@ -105,7 +105,7 @@ export default function AcceptInvitePage() {
       const profile = await fetchCurrentProfile(existing.access_token);
       if (cancelled) return;
       if (profile && profile.invite_pending === false) {
-        router.replace("/");
+        router.replace("/dashboard");
         return;
       }
       setPhase("form");
@@ -170,7 +170,7 @@ export default function AcceptInvitePage() {
         throw new Error(typeof data.detail === "string" ? data.detail : "Failed to save your profile");
       }
 
-      router.push("/");
+      router.push("/dashboard");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to complete invite");
     } finally {
@@ -243,7 +243,7 @@ export default function AcceptInvitePage() {
             className="h-11 w-full"
             onClick={() => {
               stripAuthParamsFromUrl();
-              router.push("/");
+              router.push("/dashboard");
             }}
           >
             Stay signed in as {switchFrom}

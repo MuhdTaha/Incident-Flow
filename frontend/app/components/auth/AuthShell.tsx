@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { CheckCircle2, Shield, Users } from "lucide-react";
 import { BrandMark } from "@/app/components/BrandMark";
 import { ThemeToggle } from "@/app/components/ThemeToggle";
@@ -39,10 +40,10 @@ function BrandPanel({ variant }: { variant: "login" | "signup" }) {
 
       <div className="relative z-10 flex min-h-0 flex-1 flex-col justify-between gap-10">
       <div>
-        <div className="flex items-center gap-3">
+        <Link href="/" className="flex w-fit items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">
           <BrandMark className="h-10 w-10" iconClassName="h-5 w-5" />
           <span className="text-lg font-semibold tracking-tight">IncidentFlow</span>
-        </div>
+        </Link>
 
         <div className="mt-14 max-w-md">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">
@@ -113,13 +114,13 @@ function MobileBrandBar() {
     <div className="relative overflow-hidden bg-slate-950 px-6 py-5 text-white lg:hidden">
       <div className="auth-orb pointer-events-none absolute -right-8 -top-10 h-32 w-32 rounded-full bg-blue-500/40 blur-2xl" />
       <div className="auth-orb-alt pointer-events-none absolute -bottom-10 left-10 h-24 w-24 rounded-full bg-cyan-400/30 blur-2xl" />
-      <div className="relative flex items-center gap-3">
+      <Link href="/" className="relative flex w-fit items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">
         <BrandMark className="h-9 w-9" iconClassName="h-4 w-4" />
         <div>
           <p className="font-semibold tracking-tight">IncidentFlow</p>
           <p className="text-xs text-slate-400">Incident management for engineering teams</p>
         </div>
-      </div>
+      </Link>
     </div>
   );
 }

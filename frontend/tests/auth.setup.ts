@@ -46,8 +46,8 @@ setup('authenticate', async ({ page, context }) => {
     { storageKey, session: data.session },
   );
 
-  await page.goto('/');
-  await expect(page).toHaveURL('/', { timeout: 15_000 });
+  await page.goto('/dashboard');
+  await expect(page).toHaveURL('/dashboard', { timeout: 15_000 });
   await expect(page.getByText('IncidentFlow')).toBeVisible({ timeout: 15_000 });
 
   await context.storageState({ path: authFile });

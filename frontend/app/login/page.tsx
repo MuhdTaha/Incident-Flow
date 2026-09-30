@@ -30,7 +30,7 @@ export default function LoginPage() {
         return;
       }
       if (await hasWorkspace(session.access_token)) {
-        router.replace("/");
+        router.replace("/dashboard");
         return;
       }
       router.replace("/register");
@@ -61,7 +61,7 @@ export default function LoginPage() {
         return;
       }
 
-      router.push("/");
+      router.push("/dashboard");
     } catch (err: any) {
       setError(err.message);
     } finally {
