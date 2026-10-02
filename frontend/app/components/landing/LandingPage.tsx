@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -120,14 +120,14 @@ export function LandingPage() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-blue-50 text-slate-900 dark:bg-slate-950 dark:text-slate-50">
+    <div className="relative min-h-screen overflow-x-hidden bg-blue-100 text-slate-900 dark:bg-slate-950 dark:text-slate-50">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute inset-0 dark:hidden bg-[radial-gradient(ellipse_at_top_left,rgba(147,197,253,0.55),transparent_52%),radial-gradient(ellipse_at_top_right,rgba(125,211,252,0.4),transparent_48%)]" />
         <div className="auth-orb absolute -top-32 -left-24 h-[28rem] w-[28rem] rounded-full bg-blue-300/50 blur-3xl dark:bg-blue-500/20" />
         <div className="auth-orb-alt absolute top-10 -right-24 h-[24rem] w-[24rem] rounded-full bg-cyan-300/40 blur-3xl dark:bg-cyan-400/15" />
       </div>
 
-      <header className="sticky top-0 z-40 border-b border-blue-100/70 bg-blue-50/80 backdrop-blur-md dark:border-white/10 dark:bg-slate-950/75">
+      <header className="sticky top-0 z-40 border-b border-blue-200/80 bg-blue-100/85 backdrop-blur-md dark:border-white/10 dark:bg-slate-950/75">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
           <Link href="/" className="flex items-center gap-2.5">
             <BrandMark />
@@ -184,7 +184,7 @@ export function LandingPage() {
                   key={item.href}
                   href={item.href}
                   onClick={() => setMenuOpen(false)}
-                  className="rounded-lg px-2 py-2 text-sm text-slate-700 hover:bg-white/70 dark:text-slate-200 dark:hover:bg-white/5"
+                  className="rounded-lg px-2 py-2 text-sm text-slate-700 hover:bg-blue-100/70 dark:text-slate-200 dark:hover:bg-white/5"
                 >
                   {item.label}
                 </a>
@@ -225,11 +225,11 @@ export function LandingPage() {
                 <ArrowRight className="h-4 w-4" />
               </Button>
               {signedIn ? (
-                <Button variant="outline" className="h-11 bg-white/70 px-5 dark:bg-white/5" asChild>
+                <Button variant="outline" className="h-11 border-blue-200/80 bg-blue-200/50 px-5 dark:border-white/10 dark:bg-white/5" asChild>
                   <Link href="/dashboard">Open workspace</Link>
                 </Button>
               ) : (
-                <Button variant="outline" className="h-11 bg-white/70 px-5 dark:bg-white/5" asChild>
+                <Button variant="outline" className="h-11 border-blue-200/80 bg-blue-200/50 px-5 dark:border-white/10 dark:bg-white/5" asChild>
                   <Link href="/register">Create a workspace</Link>
                 </Button>
               )}
@@ -258,7 +258,7 @@ export function LandingPage() {
             {FEATURES.map((feature) => (
               <article
                 key={feature.title}
-                className="rounded-2xl border border-white/70 bg-white/75 p-5 shadow-sm shadow-blue-950/5 backdrop-blur-md dark:border-white/10 dark:bg-white/5"
+                className="rounded-2xl border border-blue-200/70 bg-blue-200/45 p-5 shadow-sm shadow-blue-950/5 backdrop-blur-md dark:border-white/10 dark:bg-white/5"
               >
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-cyan-400 text-white shadow-md shadow-blue-500/25">
                   <feature.icon className="h-5 w-5" />
@@ -273,7 +273,7 @@ export function LandingPage() {
         </section>
 
         <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-          <div className="flex flex-col gap-4 rounded-3xl border border-blue-100/80 bg-white/70 p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-white/5">
+          <div className="flex flex-col gap-4 rounded-3xl border border-blue-200/70 bg-blue-200/50 p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-white/5">
             <div className="flex items-start gap-3">
               <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-950 text-cyan-300 dark:bg-cyan-400/15">
                 <Building2 className="h-5 w-5" />
@@ -293,12 +293,12 @@ export function LandingPage() {
         </section>
 
         <section id="how-it-works" className="scroll-mt-20 px-4 py-8 sm:px-6">
-          <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[2rem] bg-slate-950 px-6 py-12 text-white sm:px-10">
-            <div className="pointer-events-none absolute inset-0 auth-grid opacity-70" />
-            <div className="auth-orb pointer-events-none absolute -top-20 -left-10 h-64 w-64 rounded-full bg-blue-600/40 blur-3xl" />
-            <div className="auth-orb-alt pointer-events-none absolute -right-10 bottom-0 h-56 w-56 rounded-full bg-cyan-400/25 blur-3xl" />
+          <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[2rem] border border-blue-300/60 bg-blue-200/70 px-6 py-12 text-slate-900 shadow-sm sm:px-10 dark:border-white/10 dark:bg-slate-950 dark:text-white dark:shadow-none">
+            <div className="pointer-events-none absolute inset-0 auth-grid opacity-0 dark:opacity-70" />
+            <div className="auth-orb pointer-events-none absolute -top-20 -left-10 h-64 w-64 rounded-full bg-blue-300/45 blur-3xl dark:bg-blue-600/40" />
+            <div className="auth-orb-alt pointer-events-none absolute -right-10 bottom-0 h-56 w-56 rounded-full bg-cyan-200/50 blur-3xl dark:bg-cyan-400/25" />
             <div className="relative">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600 dark:text-cyan-300">
                 How it works
               </p>
               <h2 className="mt-2 max-w-xl text-3xl font-semibold tracking-tight">
@@ -306,10 +306,10 @@ export function LandingPage() {
               </h2>
               <ol className="mt-10 grid gap-6 md:grid-cols-3">
                 {STEPS.map((step) => (
-                  <li key={step.n} className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-md">
-                    <p className="font-mono text-sm text-cyan-300">{step.n}</p>
+                  <li key={step.n} className="rounded-2xl border border-blue-300/50 bg-blue-100 p-5 dark:border-white/10 dark:bg-white/5">
+                    <p className="font-mono text-sm text-blue-600 dark:text-cyan-300">{step.n}</p>
                     <h3 className="mt-3 text-lg font-semibold">{step.title}</h3>
-                    <p className="mt-2 text-sm leading-relaxed text-slate-300">{step.body}</p>
+                    <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{step.body}</p>
                   </li>
                 ))}
               </ol>
@@ -318,7 +318,7 @@ export function LandingPage() {
                   (state) => (
                     <span
                       key={state}
-                      className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-200"
+                      className="rounded-full border border-blue-300/60 bg-blue-100 px-3 py-1 text-xs text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
                     >
                       {state}
                     </span>
@@ -340,7 +340,7 @@ export function LandingPage() {
             {ROLES.map((role) => (
               <article
                 key={role.name}
-                className="rounded-2xl border border-slate-200/80 bg-white/80 p-5 dark:border-white/10 dark:bg-white/5"
+                className="rounded-2xl border border-blue-200/70 bg-blue-200/45 p-5 dark:border-white/10 dark:bg-white/5"
               >
                 <h3 className="text-base font-semibold">{role.name}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{role.body}</p>
@@ -350,7 +350,7 @@ export function LandingPage() {
         </section>
 
         <section className="mx-auto max-w-6xl px-4 pb-16 sm:px-6">
-          <div className="relative overflow-hidden rounded-[2rem] border border-blue-100 bg-white/80 px-6 py-12 text-center shadow-sm dark:border-white/10 dark:bg-white/5 sm:px-10">
+          <div className="relative overflow-hidden rounded-[2rem] border border-blue-200/70 bg-blue-200/55 px-6 py-12 text-center shadow-sm dark:border-white/10 dark:bg-white/5 sm:px-10">
             <div className="auth-orb pointer-events-none absolute -top-16 left-1/2 h-40 w-40 -translate-x-1/2 rounded-full bg-cyan-300/40 blur-3xl dark:bg-cyan-400/20" />
             <div className="relative">
               <h2 className="text-3xl font-semibold tracking-tight">See a workspace that is already in motion</h2>
@@ -396,7 +396,7 @@ function ProductPreview() {
         <p className="mt-1 text-[11px] text-slate-400">Owner · Jordan · opened 8m ago</p>
       </div>
 
-      <div className="overflow-hidden rounded-3xl border border-white/80 bg-white/80 shadow-xl shadow-blue-950/10 backdrop-blur-md dark:border-white/10 dark:bg-slate-900/70">
+      <div className="overflow-hidden rounded-3xl border border-blue-300/60 bg-blue-100 shadow-xl shadow-blue-950/10 backdrop-blur-md dark:border-white/10 dark:bg-slate-900/70">
         <div className="flex items-center justify-between border-b border-slate-200/70 px-4 py-3 dark:border-white/10">
           <div className="flex items-center gap-2">
             <BrandMark className="h-7 w-7" iconClassName="h-3.5 w-3.5" />
@@ -426,76 +426,76 @@ function ProductPreview() {
   );
 }
 
+function FooterColumn({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{title}</p>
+      <ul className="mt-3 space-y-2 text-sm">{children}</ul>
+    </div>
+  );
+}
+
 function SiteFooter({ onDemo }: { onDemo: () => void }) {
   return (
-    <footer className="relative border-t border-white/10 bg-slate-950 text-slate-300">
+    <footer className="relative border-t border-blue-300/60 bg-blue-200/80 text-slate-700 dark:border-white/10 dark:bg-slate-950 dark:text-slate-300">
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))]">
         <div>
-          <div className="flex items-center gap-2.5 text-white">
+          <div className="flex items-center gap-2.5 text-slate-900 dark:text-white">
             <BrandMark />
             <span className="font-semibold tracking-tight">IncidentFlow</span>
           </div>
-          <p className="mt-3 max-w-sm text-sm leading-relaxed text-slate-400">
+          <p className="mt-3 max-w-sm text-sm leading-relaxed text-slate-500 dark:text-slate-400">
             Multi-tenant incident management for engineering teams. Built by Muhammad Taha as an
             independent portfolio project.
           </p>
         </div>
 
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Product</p>
-          <ul className="mt-3 space-y-2 text-sm">
-            <li><a className="hover:text-white" href="#features">Features</a></li>
-            <li><a className="hover:text-white" href="#how-it-works">How it works</a></li>
-            <li>
-              <button type="button" className="hover:text-white" onClick={onDemo}>
-                Try the demo
-              </button>
-            </li>
-            <li><Link className="hover:text-white" href="/login">Sign in</Link></li>
-          </ul>
-        </div>
+        <FooterColumn title="Product">
+          <li><a className="hover:text-slate-900 dark:hover:text-white" href="#features">Features</a></li>
+          <li><a className="hover:text-slate-900 dark:hover:text-white" href="#how-it-works">How it works</a></li>
+          <li>
+            <button type="button" className="hover:text-slate-900 dark:hover:text-white" onClick={onDemo}>
+              Try the demo
+            </button>
+          </li>
+          <li><Link className="hover:text-slate-900 dark:hover:text-white" href="/login">Sign in</Link></li>
+        </FooterColumn>
 
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Project</p>
-          <ul className="mt-3 space-y-2 text-sm">
-            <li>
-              <a className="hover:text-white" href="https://github.com/MuhdTaha/Incident-Flow" target="_blank" rel="noreferrer">
-                Source code
-              </a>
-            </li>
-            <li><Link className="hover:text-white" href="/register">Create a workspace</Link></li>
-          </ul>
-        </div>
+        <FooterColumn title="Project">
+          <li>
+            <a className="hover:text-slate-900 dark:hover:text-white" href="https://github.com/MuhdTaha/Incident-Flow" target="_blank" rel="noreferrer">
+              Source code
+            </a>
+          </li>
+          <li><Link className="hover:text-slate-900 dark:hover:text-white" href="/register">Create a workspace</Link></li>
+        </FooterColumn>
 
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Connect</p>
-          <ul className="mt-3 space-y-2 text-sm">
-            <li>
-              <a
-                className="inline-flex items-center gap-2 hover:text-white"
-                href="https://www.linkedin.com/in/muhdtaha"
-                target="_blank"
-                rel="noreferrer"
-              >
-                <Linkedin className="h-4 w-4" />
-                LinkedIn
-              </a>
-            </li>
-            <li>
-              <a
-                className="inline-flex items-center gap-2 hover:text-white"
-                href="https://github.com/MuhdTaha"
-                target="_blank"
-                rel="noreferrer"
-              >
-                <Github className="h-4 w-4" />
-                GitHub
-              </a>
-            </li>
-          </ul>
-        </div>
+        <FooterColumn title="Connect">
+          <li>
+            <a
+              className="inline-flex items-center gap-2 hover:text-slate-900 dark:hover:text-white"
+              href="https://www.linkedin.com/in/muhdtaha"
+              target="_blank"
+              rel="noreferrer"
+            >
+              <Linkedin className="h-4 w-4" />
+              LinkedIn
+            </a>
+          </li>
+          <li>
+            <a
+              className="inline-flex items-center gap-2 hover:text-slate-900 dark:hover:text-white"
+              href="https://github.com/MuhdTaha"
+              target="_blank"
+              rel="noreferrer"
+            >
+              <Github className="h-4 w-4" />
+              GitHub
+            </a>
+          </li>
+        </FooterColumn>
       </div>
-      <div className="border-t border-white/10">
+      <div className="border-t border-blue-200/70 dark:border-white/10">
         <p className="mx-auto max-w-6xl px-4 py-4 text-xs text-slate-500 sm:px-6">
           © {new Date().getFullYear()} Muhammad Taha. Chicago.
         </p>
